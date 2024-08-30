@@ -1,0 +1,10 @@
+{
+  "files.associations": {
+    "*.vue": "vue",
+    "*.wpy": "vue",
+    "*.wxml": "html",
+    "*.wxss": "css",
+    "crc8.h": "c",
+    "sht3x.h": "c"
+  }
+}

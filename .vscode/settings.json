@@ -1,0 +1,21 @@
+{
+        "files.associations": {
+                "*.vue": "vue",
+                "*.wpy": "vue",
+                "*.wxml": "html",
+                "*.wxss": "css",
+                "crc8.h": "c",
+                "gpio.h": "c",
+                "i2c.h": "c",
+                "my_mpu6050.h": "c",
+                "at24cxx.h": "c",
+                "stm32f1xx_hal.h": "c",
+                "main.h": "c",
+                "spi.h": "c",
+                "utils.h": "c",
+                "inv_mpu_dmp_motion_driver.h": "c",
+                "atk_ms6050.h": "c",
+                "oled.h": "c",
+                "inv_mpu.h": "c"
+        }
+}
