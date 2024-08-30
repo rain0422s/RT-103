@@ -16,6 +16,10 @@
                 "inv_mpu_dmp_motion_driver.h": "c",
                 "atk_ms6050.h": "c",
                 "oled.h": "c",
-                "inv_mpu.h": "c"
+                "inv_mpu.h": "c",
+                "stdio.h": "c",
+                "stdint.h": "c",
+                "sht3x.h": "c",
+                "stddef.h": "c"
         }
 }

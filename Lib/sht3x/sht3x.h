@@ -8,33 +8,31 @@
 #define SHT3X_DEBUG_LOG 0
 #if SHT3X_DEBUG_LOG
 #define SHT3X_TAG "[SHT3X_SENSOR]"
-#define SHT3X_log(format, args...) \
+#define sht3x_log(format, args...) \
 	printf(SHT3X_TAG "%s[%u] " format, __func__, __LINE__, ##args);
 #else
-#define SHT3X_log(format, args...)
+#define sht3x_log(format, args...)
 #endif
 
 
 /* Define the SHT3x object type */
 typedef struct SHT3xObject{
-        uint8_t devAddress;           // SHT3x address
-        uint16_t status;              // SHT3x status register value
-        float temperature;
-        float humidity;
+        uint8_t addr;          
+        uint16_t status;
+        I2C_HandleTypeDef hi2c;         
+        float temp;
+        float rh;
 
 }SHT3xObjectType;
 
 typedef enum {
-      SHT3X_NO_ERROR ,
+      SHT3X_NO_ERROR,
       SHT3X_PARM_ERROR
 }SHT3xErrorType;
 
 
-#define SHT30_ADDR_LOW  0x44
-#define SHT30_ADDR_HIGH 0x45
-#define SHT3X_I2C       hi2c1                 
-#define SHT3X_DEV       (SHT30_ADDR_LOW << 1) 
-#define SOFT_RESET_CMD 0x30A2  // 软复位命令
+// 软复位命令
+#define SOFT_RESET_CMD 0x30A2 
 
 /* 单次测量模式 */
 #define CLOCK_HIGH_ENABLED_CMD    0x2C06
@@ -74,7 +72,7 @@ typedef enum {
 #define READOUT_FOR_PERIODIC_MODE 0xE000  // 周期测量模式读取数据命令
 
 
-uint8_t SHT3x_Read(SHT3xObjectType *sht);
-SHT3xErrorType SHT3xInitialization(SHT3xObjectType *sht , uint8_t address);  
+SHT3xErrorType sht3x_get_sensor_value(SHT3xObjectType *sht);
+SHT3xErrorType sht3x_init(SHT3xObjectType *sht,uint8_t address,I2C_HandleTypeDef hi2c);
 
 #endif

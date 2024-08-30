@@ -500,7 +500,7 @@ int main(void)
 
         u8g2Init(&u8g2);
         SHT3xObjectType sht;
-        SHT3xInitialization(&sht ,  SHT30_ADDR_LOW );
+        sht3x_init(&sht ,0x44,hi2c1);
 	//u8g2_FirstPage(&u8g2);
 
         SPI_Flash_Test();
@@ -686,7 +686,7 @@ loop1();
 		HAL_Delay(300);
 
                 if (!SHT3x_Read(&sht))
-                        printf("%4f, %4f\n", sht.temperature, sht.humidity);
+                        printf("%4f, %4f\n", sht.temp, sht.rh);
                 draw(&u8g2);
                 HAL_Delay(500);
       
