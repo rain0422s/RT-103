@@ -84,7 +84,7 @@ typedef struct W25QxObject{
 #define W25QXX_FSR_WREN 0x02 /*!< write enable */
 #define W25QXX_FSR_QE 0x02   /*!< quad enable */
 
-#define w25qxx_enable () HAL_GPIO_WritePin(CS_GPIO_Port, CS_Pin, GPIO_PIN_RESET)
+#define w25qxx_enable()  HAL_GPIO_WritePin(CS_GPIO_Port, CS_Pin, GPIO_PIN_RESET)
 #define w25qxx_disable() HAL_GPIO_WritePin(CS_GPIO_Port, CS_Pin, GPIO_PIN_SET)
 
 #define W25Qx_OK 0x00

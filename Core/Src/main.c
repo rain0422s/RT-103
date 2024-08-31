@@ -338,13 +338,13 @@ void demo_run(void)
 
 
 
-void SPI_Flash_Test(void)
+void SPI_Flash_Test(W25QxObjectType *w25qx)
 {
 	printf("SPI-W25Qxxx Example \n");
 
     /*1- Read the device ID */
-    W25QXX_Init();
-    W25QXX_Read_ID(ID);
+    w25qxx_Init(w25qx,hspi1,W25Qx_TIMEOUT_VALUE);
+    w25qxx_read_id(w25qx,ID);
     printf("W25Qxxx ID is : ");
     for (i = 0; i < 2; i++) {
         printf("0x%02X ", ID[i]);
@@ -352,7 +352,7 @@ void SPI_Flash_Test(void)
     printf("\n");
 
     /* 2- Erase */
-    if (W25QXX_Erase_Block(0) == W25Qx_OK)
+    if (w25qxx_erase_block(w25qx,0) == W25Qx_OK)
         printf(" SPI Erase Block ok\n");
     else
         Error_Handler();
@@ -364,13 +364,13 @@ void SPI_Flash_Test(void)
         rData[i] = 0;
     }
 
-    if (W25QXX_Write(wData, 0x00, 0x100) == W25Qx_OK)
+    if (w25qxx_write(w25qx,wData, 0x00, 0x100) == W25Qx_OK)
         printf(" SPI Write ok\n");
     else
         Error_Handler();
 
     /* 3- Read the flash */
-    if (W25QXX_Read(rData, 0x00, 0x100) == W25Qx_OK)
+    if (w25qxx_read(w25qx,rData, 0x00, 0x100) == W25Qx_OK)
         printf(" SPI Read ok\n");
     else
         Error_Handler();
@@ -503,7 +503,8 @@ int main(void)
         sht3x_init(&sht ,0x44,hi2c1);
 	//u8g2_FirstPage(&u8g2);
 
-        SPI_Flash_Test();
+        W25QxObjectType w25qx;
+        SPI_Flash_Test(&w25qx);
 
 
         static soft_i2c_t swi2c3_bus = {

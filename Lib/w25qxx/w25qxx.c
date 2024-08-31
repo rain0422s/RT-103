@@ -21,9 +21,9 @@ uint8_t w25qxx_Init(W25QxObjectType *w25qx,SPI_HandleTypeDef spi,uint32_t timeou
         w25qx->timeout = timeout;
 
         /* Reset W25Qxxx */
-        w25qxx_reset();
+        w25qxx_reset(w25qx);
 
-        return w25qxx_getstatus();
+        return w25qxx_getstatus(w25qx);
 }
 
 /**
@@ -78,7 +78,7 @@ uint8_t w25qxx_write_enable(W25QxObjectType *w25qx){
         w25qxx_disable();
 
         /* Wait the end of Flash writing */
-        while (w25qxx_getstatus() == W25Qx_BUSY)
+        while (w25qxx_getstatus(w25qx) == W25Qx_BUSY)
                 ;
         {
                 /* Check for the Timeout */
@@ -175,7 +175,7 @@ uint8_t w25qxx_write(W25QxObjectType *w25qx,uint8_t* pData, uint32_t WriteAddr, 
                 cmd[3] = (uint8_t)(current_addr);
 
                 /* Enable write operations */
-                w25qxx_write_enable();
+                w25qxx_write_enable(w25qx);
 
                 w25qxx_enable();
                 /* Send the command */
@@ -189,7 +189,7 @@ uint8_t w25qxx_write(W25QxObjectType *w25qx,uint8_t* pData, uint32_t WriteAddr, 
                 
                 w25qxx_disable();
                 /* Wait the end of Flash writing */
-                while (w25qxx_getstatus() == W25Qx_BUSY)
+                while (w25qxx_getstatus(w25qx) == W25Qx_BUSY)
                         ;
                 {
                         /* Check for the Timeout */
@@ -222,7 +222,7 @@ uint8_t w25qxx_erase_block(W25QxObjectType *w25qx,uint32_t Address)
     cmd[3]             = (uint8_t)(Address);
 
     /* Enable write operations */
-    w25qxx_write_enable();
+    w25qxx_write_enable(w25qx);
 
     /*Select the FLASH: Chip Select low */
     w25qxx_enable();
@@ -232,7 +232,7 @@ uint8_t w25qxx_erase_block(W25QxObjectType *w25qx,uint32_t Address)
     w25qxx_disable();
 
     /* Wait the end of Flash writing */
-    while (w25qxx_getstatus() == W25Qx_BUSY)
+    while (w25qxx_getstatus(w25qx) == W25Qx_BUSY)
         ;
     {
         /* Check for the Timeout */
@@ -254,7 +254,7 @@ uint8_t w25qxx_erase_chip(W25QxObjectType *w25qx)
     cmd[0]             = SECTOR_ERASE_CMD;
 
     /* Enable write operations */
-    w25qxx_write_enable();
+    w25qxx_write_enable(w25qx);
 
     /*Select the FLASH: Chip Select low */
     w25qxx_enable();
@@ -264,7 +264,7 @@ uint8_t w25qxx_erase_chip(W25QxObjectType *w25qx)
     w25qxx_disable();
 
     /* Wait the end of Flash writing */
-    while (w25qxx_getstatus() != W25Qx_BUSY)
+    while (w25qxx_getstatus(w25qx) != W25Qx_BUSY)
         ;
     {
         /* Check for the Timeout */
