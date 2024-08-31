@@ -2,11 +2,15 @@
 #define __W25QXX_H
 
 #include "spi.h"
-
+#include "stdint.h"
 #define W25QXX_SPI hspi1
 #define CS_GPIO_Port  GPIOA
 #define CS_Pin        GPIO_PIN_4
 // Configuration
+typedef struct W25QxObject{
+        SPI_HandleTypeDef spi;         
+        uint32_t timeout;
+}W25QxObjectType;
 
 // 仅支持 128Mbits 及以下，因为 256Mbits 及以上的是 4字节地址
 
@@ -80,22 +84,22 @@
 #define W25QXX_FSR_WREN 0x02 /*!< write enable */
 #define W25QXX_FSR_QE 0x02   /*!< quad enable */
 
-#define W25Qx_Enable() HAL_GPIO_WritePin(CS_GPIO_Port, CS_Pin, GPIO_PIN_RESET)
-#define W25Qx_Disable() HAL_GPIO_WritePin(CS_GPIO_Port, CS_Pin, GPIO_PIN_SET)
+#define w25qxx_enable () HAL_GPIO_WritePin(CS_GPIO_Port, CS_Pin, GPIO_PIN_RESET)
+#define w25qxx_disable() HAL_GPIO_WritePin(CS_GPIO_Port, CS_Pin, GPIO_PIN_SET)
 
 #define W25Qx_OK 0x00
 #define W25Qx_ERROR 0x01
 #define W25Qx_BUSY 0x02
 #define W25Qx_TIMEOUT 0x03
 
-uint8_t        W25QXX_Init(void);
-static void    W25QXX_Reset(void);
-static uint8_t W25QXX_GetStatus(void);
-uint8_t        W25QXX_WriteEnable(void);
-void           W25QXX_Read_ID(uint8_t* ID);
-uint8_t        W25QXX_Read(uint8_t* pData, uint32_t ReadAddr, uint32_t Size);
-uint8_t        W25QXX_Write(uint8_t* pData, uint32_t WriteAddr, uint32_t Size);
-uint8_t        W25QXX_Erase_Block(uint32_t Address);
-uint8_t        W25QXX_Erase_Chip(void);
+uint8_t         w25qxx_Init(W25QxObjectType *w25qx,SPI_HandleTypeDef spi,uint32_t timeout);
+static void     w25qxx_reset(W25QxObjectType *w25qx);
+static uint8_t  w25qxx_getstatus(W25QxObjectType *w25qx);
+uint8_t         w25qxx_write_enable(W25QxObjectType *w25qx);
+void            w25qxx_read_id(W25QxObjectType *w25qx,uint8_t* ID);
+uint8_t         w25qxx_read(W25QxObjectType *w25qx,uint8_t* pData, uint32_t ReadAddr, uint32_t Size);
+uint8_t         w25qxx_write(W25QxObjectType *w25qx,uint8_t* pData, uint32_t WriteAddr, uint32_t Size);
+uint8_t         w25qxx_erase_block(W25QxObjectType *w25qx,uint32_t Address);
+uint8_t         w25qxx_erase_chip(W25QxObjectType *w25qx);
 
 #endif /* __W25QXX_H */
