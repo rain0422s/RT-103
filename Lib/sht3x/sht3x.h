@@ -19,7 +19,7 @@
 typedef struct SHT3xObject{
         uint8_t addr;          
         uint16_t status;
-        I2C_HandleTypeDef hi2c;         
+        I2C_HandleTypeDef i2c;         
         float temp;
         float rh;
 
