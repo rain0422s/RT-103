@@ -20,6 +20,7 @@
                 "stdio.h": "c",
                 "stdint.h": "c",
                 "sht3x.h": "c",
-                "stddef.h": "c"
+                "stddef.h": "c",
+                "w25qxx.h": "c"
         }
 }
