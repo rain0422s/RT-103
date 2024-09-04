@@ -9,6 +9,6 @@ typedef struct {
     float f;
 } object_t;
 
-void SPI_Flash_Test(W25QxObjectType *w25qx,uint8_t *ID);
+void spi_flash_test(W25QxObjectType *w25qx,uint8_t *ID);
 void at24_test(void);
 #endif

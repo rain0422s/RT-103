@@ -27,6 +27,7 @@
                 "storage.h": "c",
                 "u8g2.h": "c",
                 "display.h": "c",
-                "sensor.h": "c"
+                "sensor.h": "c",
+                "adc.h": "c"
         }
 }

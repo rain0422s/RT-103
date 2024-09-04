@@ -19,9 +19,11 @@ uint8_t MPU6050ReadID(void){
 
 }
 
-uint8_t sensor_init(SHT3xObjectType sht,uint16_t ADC_Value,ADC_HandleTypeDef adc){
+uint8_t sensor_init(SHT3xObjectType sht,uint16_t* ADC_Value,ADC_HandleTypeDef adc){
+        sht3x_init(&sht ,0x44,hi2c1);
         HAL_ADCEx_Calibration_Start(&adc);
         HAL_ADC_Start_DMA(&adc,(uint32_t*)&ADC_Value, 100);
+        mpu6050_init();
 }
 
 uint8_t get_sensor_value(SHT3xObjectType sht,uint16_t *ADC_Value){       

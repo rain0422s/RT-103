@@ -50,18 +50,19 @@
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
+#define TURN_ON_LED() do {                           \
+HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0,GPIO_PIN_RESET );\
+} while(0)
 
+#define TURN_OFF_LED() do {                        \
+HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0,GPIO_PIN_SET );\
+} while(0)
+        
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-        uint32_t  i=500; //50ms
-
-        uint8_t  ID[4];
-
-
-
 
 
 /* USER CODE END PV */
@@ -86,7 +87,8 @@ int main(void)
 {
   /* USER CODE BEGIN 1 */
         uint16_t ADC_Value[100];
-
+        uint32_t i=500; //50ms
+        uint8_t  ID[4];
 
   /* USER CODE END 1 */
 
@@ -119,21 +121,16 @@ int main(void)
   MX_USB_PCD_Init();
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
-
-
         SHT3xObjectType sht;
-        sht3x_init(&sht ,0x44,hi2c1);
-
+        sensor_init(sht,ADC_Value,hadc1);
 
         W25QxObjectType w25qx;
-        SPI_Flash_Test(&w25qx,ID);
+        spi_flash_test(&w25qx,ID);
 
         at24_test();
 
         u8g2_t u8g2;
         ui_test(u8g2);
-        sensor_init(sht,ADC_Value,hadc1);
-        mpu6050_init();
 
   /* USER CODE END 2 */
 
@@ -149,11 +146,6 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-
-        HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0,GPIO_PIN_RESET );
-        HAL_Delay(500);
-        HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0,GPIO_PIN_SET );
-        HAL_Delay(500);
 
   }
   /* USER CODE END 3 */
