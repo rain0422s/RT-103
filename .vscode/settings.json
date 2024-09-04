@@ -21,6 +21,12 @@
                 "stdint.h": "c",
                 "sht3x.h": "c",
                 "stddef.h": "c",
-                "w25qxx.h": "c"
+                "w25qxx.h": "c",
+                "string.h": "c",
+                "i2cdev.h": "c",
+                "storage.h": "c",
+                "u8g2.h": "c",
+                "display.h": "c",
+                "sensor.h": "c"
         }
 }
