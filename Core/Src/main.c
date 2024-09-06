@@ -86,10 +86,11 @@ void SystemClock_Config(void);
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-        uint16_t ADC_Value[100];
-        uint32_t i=500; //50ms
-        uint8_t  ID[4];
-
+        uint16_t adc_value[100];
+        SHT3xObjectType sht;
+        W25QxObjectType w25qx;
+        struct i2c_cli m24c02;
+        u8g2_t u8g2;
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -121,15 +122,16 @@ int main(void)
   MX_USB_PCD_Init();
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
-        SHT3xObjectType sht;
-        sensor_init(sht,ADC_Value,hadc1);
 
-        W25QxObjectType w25qx;
-        spi_flash_test(&w25qx,ID);
+        sensor_init(sht,adc_value,hadc1);
 
-        at24_test();
 
-        u8g2_t u8g2;
+        spi_flash_test(&w25qx);
+
+
+        i2c_eeprom_test(m24c02);
+
+
         ui_test(u8g2);
 
   /* USER CODE END 2 */
@@ -141,8 +143,8 @@ int main(void)
         loop1(u8g2);
 
         get_mpu6050_value();
-        //delay_ms(200)
-        get_sensor_value(sht,ADC_Value);
+
+        get_sensor_value(sht,adc_value);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */

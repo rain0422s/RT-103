@@ -17,7 +17,7 @@ void loop2(u8g2_t *u8g2) {
         }
 }
 
-short frame_len,frame_len_trg;  //Width of the box
+short frame_len,frame_len_trg;  //Width  of the box
 short frame_y,frame_y_trg;      //Height of the box
 signed  char ui_select = 0;
 

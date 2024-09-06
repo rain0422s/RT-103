@@ -92,7 +92,7 @@ typedef struct W25QxObject{
 #define W25Qx_BUSY 0x02
 #define W25Qx_TIMEOUT 0x03
 
-uint8_t         w25qxx_Init(W25QxObjectType *w25qx,SPI_HandleTypeDef spi,uint32_t timeout);
+uint8_t         w25qxx_init(W25QxObjectType *w25qx,SPI_HandleTypeDef spi,uint32_t timeout);
 static void     w25qxx_reset(W25QxObjectType *w25qx);
 static uint8_t  w25qxx_getstatus(W25QxObjectType *w25qx);
 uint8_t         w25qxx_write_enable(W25QxObjectType *w25qx);

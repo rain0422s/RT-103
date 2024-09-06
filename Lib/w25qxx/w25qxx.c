@@ -15,7 +15,7 @@ HAL_StatusTypeDef w25qxx_receive(W25QxObjectType *w25qx,uint8_t* buff,uint16_t l
  *
  *
  *@retval None*/
-uint8_t w25qxx_Init(W25QxObjectType *w25qx,SPI_HandleTypeDef spi,uint32_t timeout){
+uint8_t w25qxx_init(W25QxObjectType *w25qx,SPI_HandleTypeDef spi,uint32_t timeout){
 
         w25qx->spi     = spi;         
         w25qx->timeout = timeout;
