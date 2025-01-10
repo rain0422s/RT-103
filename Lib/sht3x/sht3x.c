@@ -82,7 +82,7 @@ SHT3xErrorType sht3x_init(SHT3xObjectType *sht,uint8_t address,I2C_HandleTypeDef
   
         sht->i2c = hi2c;
         sht3x_writcmd(sht,SOFT_RESET_CMD);
-        HAL_Delay(20);
+        delay_ms(20);
         sht3x_writcmd(sht,PERI_MEDIUM_2_CMD);
 
         error |= sht3x_read_status_reg(sht);

@@ -28,6 +28,14 @@
                 "u8g2.h": "c",
                 "display.h": "c",
                 "sensor.h": "c",
-                "adc.h": "c"
+                "adc.h": "c",
+                "freertos.h": "c",
+                "core_cm3.h": "c",
+                "freertosconfig.h": "c",
+                "lfs_util.h": "c",
+                "inttypes.h": "c",
+                "lfs.h": "c",
+                "task.h": "c",
+                "usart.h": "c"
         }
 }

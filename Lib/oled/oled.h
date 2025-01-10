@@ -3,7 +3,7 @@
 
 
 #include "u8g2.h"
-#include "main.h"
+#include "utils.h"
 #include "i2c.h"
 #define CONFIG_SCREEN_HEIGHT 64   // height of screen
 #define CONFIG_SCREEN_WIDTH  128  // width of screen

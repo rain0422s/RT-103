@@ -9,6 +9,7 @@ void* memcpy_byte(void* dst, const void* src, int n)
     char* psrc = (char*)src;
 
     if (pdst > psrc && pdst < psrc + n) {
+        /*Memory overlap between pdst and psrc Pointers*/
         pdst = pdst + n - 1;
         psrc = psrc + n - 1;
         while (n--)
@@ -30,8 +31,8 @@ uint8_t u8x8_byte_hw_i2c(u8x8_t* u8x8, uint8_t msg, uint8_t arg_int, void* arg_p
 
     switch (msg) {
         case U8X8_MSG_BYTE_INIT: {
-            // i2c init
-            break;
+                MX_I2C1_Init();// i2c init
+                break;
         }
         case U8X8_MSG_BYTE_START_TRANSFER: {
             length = 0;
@@ -46,7 +47,7 @@ uint8_t u8x8_byte_hw_i2c(u8x8_t* u8x8, uint8_t msg, uint8_t arg_int, void* arg_p
             if (HAL_I2C_Master_Transmit(&hi2c1, SSD1306_ADDRESS, buffer, length, 0xFF) != HAL_OK) return 0;
             break;
         }
-        case U8X8_MSG_BYTE_SET_DC: {
+        case U8X8_MSG_BYTE_SET_DC: {    
             break;
         }
         default:
@@ -55,12 +56,13 @@ uint8_t u8x8_byte_hw_i2c(u8x8_t* u8x8, uint8_t msg, uint8_t arg_int, void* arg_p
     return 1;
 }
 
-void delay_us(uint32_t time)
-{
-    uint32_t i = 8 * time;
-    while (i--)
-        ;
-}
+
+// void delay_us(uint32_t time)
+// {
+//     uint32_t i = 8 * time;
+//     while (i--)
+//         ;
+// }
 
 uint8_t u8x8_gpio_and_delay(u8x8_t* u8x8, uint8_t msg, uint8_t arg_int, void* arg_ptr)
 {
@@ -74,7 +76,7 @@ uint8_t u8x8_gpio_and_delay(u8x8_t* u8x8, uint8_t msg, uint8_t arg_int, void* ar
             }
             break;
         case U8X8_MSG_DELAY_MILLI:  // delay arg_int * 1 milli second
-            HAL_Delay(1);
+            delay_ms(1);
             break;
         case U8X8_MSG_DELAY_I2C:  // arg_int is the I2C speed in 100KHz, e.g. 4 = 400 KHz
             delay_us(5);
@@ -104,9 +106,9 @@ uint8_t u8x8_gpio_and_delay(u8x8_t* u8x8, uint8_t msg, uint8_t arg_int, void* ar
 
 void u8g2Init(u8g2_t* u8g2)
 {
-    //u8g2_Setup_ssd1306_i2c_128x64_noname_f(u8g2, U8G2_R0, u8x8_byte_hw_i2c, u8x8_gpio_and_delay);
-    u8g2_Setup_sh1106_i2c_128x64_noname_f(u8g2, U8G2_R0, u8x8_byte_hw_i2c, u8x8_gpio_and_delay); 
-    u8g2_InitDisplay(u8g2);
-    u8g2_SetPowerSave(u8g2, 0);  // 使能
-    u8g2_ClearBuffer(u8g2);
+        //u8g2_Setup_ssd1306_i2c_128x64_noname_f(u8g2, U8G2_R0, u8x8_byte_hw_i2c, u8x8_gpio_and_delay);
+        u8g2_Setup_sh1106_i2c_128x64_noname_f(u8g2, U8G2_R0, u8x8_byte_hw_i2c, u8x8_gpio_and_delay); 
+        u8g2_InitDisplay(u8g2);
+        u8g2_SetPowerSave(u8g2, 0); 
+        u8g2_ClearBuffer(u8g2);
 }

@@ -1,41 +1,27 @@
 #include "w25qxx.h"
 
-HAL_StatusTypeDef w25qxx_transmit(W25QxObjectType *w25qx,uint16_t data,uint16_t len){
+HAL_StatusTypeDef w25qxx_transmit(uint8_t* data,uint16_t len){
         return HAL_SPI_Transmit(
-                &w25qx->spi, data, len, w25qx->timeout);
+                &hspi1, data, len, W25Qx_TIMEOUT_VALUE);
 }
 
-HAL_StatusTypeDef w25qxx_receive(W25QxObjectType *w25qx,uint8_t* buff,uint16_t len){
+HAL_StatusTypeDef w25qxx_receive(uint8_t* buff,uint16_t len){
 
         return HAL_SPI_Receive(
-                &w25qx->spi, buff, len, w25qx->timeout);
+                &hspi1, buff, len, W25Qx_TIMEOUT_VALUE);
 }
-/**
- * @brief
- *
- *
- *@retval None*/
-uint8_t w25qxx_init(W25QxObjectType *w25qx,SPI_HandleTypeDef spi,uint32_t timeout){
 
-        w25qx->spi     = spi;         
-        w25qx->timeout = timeout;
-
-        /* Reset W25Qxxx */
-        w25qxx_reset(w25qx);
-
-        return w25qxx_getstatus(w25qx);
-}
 
 /**
  * @brief  This function reset the W25Qx.
  * @retval None
  */
-static void w25qxx_reset(W25QxObjectType *w25qx){
+void w25qxx_reset(){
         uint8_t cmd[2] = {RESET_ENABLE_CMD, RESET_MEMORY_CMD};
 
         w25qxx_enable();
         /* Send the reset command */
-        w25qxx_transmit(w25qx,cmd,2);   
+        w25qxx_transmit(cmd,2);   
         w25qxx_disable();
 }
 
@@ -43,15 +29,15 @@ static void w25qxx_reset(W25QxObjectType *w25qx){
  * @brief  Reads current status of the W25QXX.
  * @retval W25QXX memory status
  */
-static uint8_t w25qxx_getstatus(W25QxObjectType *w25qx){
+uint8_t w25qxx_getstatus(){
         uint8_t cmd[] = {READ_STATUS_REG1_CMD};
         uint8_t status;
 
         w25qxx_enable();
         /* Send the read status command */
-        w25qxx_transmit(w25qx,cmd,1);                 
+        w25qxx_transmit(cmd,1);                 
         /* Reception of the data */
-        w25qxx_receive(w25qx,&status,1);
+        w25qxx_receive(&status,1);
         w25qxx_disable();
 
         /* Check the value of the register */
@@ -66,19 +52,19 @@ static uint8_t w25qxx_getstatus(W25QxObjectType *w25qx){
  * @brief  This function send a Write Enable and wait it is effective.
  * @retval None
  */
-uint8_t w25qxx_write_enable(W25QxObjectType *w25qx){
+uint8_t w25qxx_write_enable(){
         uint8_t  cmd[]     = {WRITE_ENABLE_CMD};
         uint32_t tickstart = HAL_GetTick();
 
         /*Select the FLASH: Chip Select low */
         w25qxx_enable();
         /* Send the read ID command */
-        w25qxx_transmit(w25qx,cmd,1);
+        w25qxx_transmit(cmd,1);
         /*Deselect the FLASH: Chip Select high */
         w25qxx_disable();
 
         /* Wait the end of Flash writing */
-        while (w25qxx_getstatus(w25qx) == W25Qx_BUSY)
+        while (w25qxx_getstatus() == W25Qx_BUSY)
                 ;
         {
                 /* Check for the Timeout */
@@ -95,15 +81,15 @@ uint8_t w25qxx_write_enable(W25QxObjectType *w25qx){
  * @param  return value address
  * @retval None
  */
-void w25qxx_read_id(W25QxObjectType *w25qx,uint8_t* ID){
+void w25qxx_read_id(uint8_t* ID){
 
         uint8_t cmd[4] = {READ_ID_CMD, 0x00, 0x00, 0x00};
 
         w25qxx_enable();
         /* Send the read ID command */
-        w25qxx_transmit(w25qx,cmd,4);
+        w25qxx_transmit(cmd,4);
         /* Reception of the data */
-        w25qxx_receive(w25qx,ID,2);
+        w25qxx_receive(ID,2);
 
         w25qxx_disable();
 }
@@ -115,7 +101,7 @@ void w25qxx_read_id(W25QxObjectType *w25qx,uint8_t* ID){
  * @param  Size: Size of data to read
  * @retval QSPI memory status
  */
-uint8_t w25qxx_read(W25QxObjectType *w25qx,uint8_t* pData, uint32_t ReadAddr, uint32_t Size){
+uint8_t w25qxx_read(uint8_t* pData, uint32_t ReadAddr, uint32_t Size){
 
         uint8_t cmd[4];
 
@@ -127,9 +113,9 @@ uint8_t w25qxx_read(W25QxObjectType *w25qx,uint8_t* pData, uint32_t ReadAddr, ui
 
         w25qxx_enable();
         /* Send the read ID command */
-        w25qxx_transmit(w25qx,cmd,4);
+        w25qxx_transmit(cmd,4);
         /* Reception of the data */
-        if (w25qxx_receive(w25qx, pData, Size) != HAL_OK) 
+        if (w25qxx_receive(pData, Size) != HAL_OK) 
         return W25Qx_ERROR;
 
         w25qxx_disable();
@@ -143,7 +129,7 @@ uint8_t w25qxx_read(W25QxObjectType *w25qx,uint8_t* pData, uint32_t ReadAddr, ui
  * @param  Size: Size of data to write,No more than 256byte.
  * @retval QSPI memory status
  */
-uint8_t w25qxx_write(W25QxObjectType *w25qx,uint8_t* pData, uint32_t WriteAddr, uint32_t Size)
+uint8_t w25qxx_write(uint8_t* pData, uint32_t WriteAddr, uint32_t Size)
 {
         uint8_t  cmd[4];
         uint32_t end_addr, current_size, current_addr;
@@ -175,21 +161,21 @@ uint8_t w25qxx_write(W25QxObjectType *w25qx,uint8_t* pData, uint32_t WriteAddr, 
                 cmd[3] = (uint8_t)(current_addr);
 
                 /* Enable write operations */
-                w25qxx_write_enable(w25qx);
+                w25qxx_write_enable();
 
                 w25qxx_enable();
                 /* Send the command */
-                if (w25qxx_transmit(w25qx, cmd, 4) != HAL_OK)
+                if (w25qxx_transmit( cmd, 4) != HAL_OK)
                         return W25Qx_ERROR;
                 
 
                 /* Transmission of the data */
-                if (w25qxx_transmit(w25qx, pData, current_size) != HAL_OK)
+                if (w25qxx_transmit( pData, current_size) != HAL_OK)
                         return W25Qx_ERROR;
                 
                 w25qxx_disable();
                 /* Wait the end of Flash writing */
-                while (w25qxx_getstatus(w25qx) == W25Qx_BUSY)
+                while (w25qxx_getstatus() == W25Qx_BUSY)
                         ;
                 {
                         /* Check for the Timeout */
@@ -212,7 +198,7 @@ uint8_t w25qxx_write(W25QxObjectType *w25qx,uint8_t* pData, uint32_t WriteAddr, 
  * @param  BlockAddress: Block address to erase
  * @retval QSPI memory status
  */
-uint8_t w25qxx_erase_block(W25QxObjectType *w25qx,uint32_t Address)
+uint8_t w25qxx_erase_block(uint32_t Address)
 {
     uint8_t  cmd[4];
     uint32_t tickstart = HAL_GetTick();
@@ -222,17 +208,17 @@ uint8_t w25qxx_erase_block(W25QxObjectType *w25qx,uint32_t Address)
     cmd[3]             = (uint8_t)(Address);
 
     /* Enable write operations */
-    w25qxx_write_enable(w25qx);
+    w25qxx_write_enable();
 
     /*Select the FLASH: Chip Select low */
     w25qxx_enable();
     /* Send the read ID command */
-    w25qxx_transmit(w25qx, cmd, 4);
+    w25qxx_transmit(cmd, 4);
     /*Deselect the FLASH: Chip Select high */
     w25qxx_disable();
 
     /* Wait the end of Flash writing */
-    while (w25qxx_getstatus(w25qx) == W25Qx_BUSY)
+    while (w25qxx_getstatus() == W25Qx_BUSY)
         ;
     {
         /* Check for the Timeout */
@@ -247,24 +233,24 @@ uint8_t w25qxx_erase_block(W25QxObjectType *w25qx,uint32_t Address)
  * @brief  Erases the entire QSPI memory.This function will take a very long time.
  * @retval QSPI memory status
  */
-uint8_t w25qxx_erase_chip(W25QxObjectType *w25qx)
+uint8_t w25qxx_erase_chip()
 {
     uint8_t  cmd[4];
     uint32_t tickstart = HAL_GetTick();
     cmd[0]             = SECTOR_ERASE_CMD;
 
     /* Enable write operations */
-    w25qxx_write_enable(w25qx);
+    w25qxx_write_enable();
 
     /*Select the FLASH: Chip Select low */
     w25qxx_enable();
     /* Send the read ID command */
-    w25qxx_transmit(w25qx, cmd, 1);
+    w25qxx_transmit(cmd, 1);
     /*Deselect the FLASH: Chip Select high */
     w25qxx_disable();
 
     /* Wait the end of Flash writing */
-    while (w25qxx_getstatus(w25qx) != W25Qx_BUSY)
+    while (w25qxx_getstatus() != W25Qx_BUSY)
         ;
     {
         /* Check for the Timeout */

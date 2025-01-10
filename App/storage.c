@@ -1,7 +1,7 @@
 #include "storage.h"
 
 
-void spi_flash_test(W25QxObjectType *w25qx)
+void spi_flash_test()
 {
         uint8_t  ID[4];
         uint8_t  i;
@@ -10,9 +10,10 @@ void spi_flash_test(W25QxObjectType *w25qx)
 	printf("SPI-W25Qxxx Example \n");
 
         /*1- Read the device ID */
-        w25qxx_init(w25qx,hspi1,W25Qx_TIMEOUT_VALUE);
 
-        w25qxx_read_id(w25qx,ID);
+        w25qxx_reset();
+
+        w25qxx_read_id(ID);
 
         printf("W25Qxxx ID is : ");
         for (i = 0; i < 2; i++) {
@@ -21,7 +22,7 @@ void spi_flash_test(W25QxObjectType *w25qx)
         printf("\n");
 
         /* 2- Erase */
-        if (w25qxx_erase_block(w25qx,0) == W25Qx_OK)
+        if (w25qxx_erase_block(0) == W25Qx_OK)
                 printf(" SPI Erase Block ok\n");
         else
                 Error_Handler();
@@ -33,13 +34,13 @@ void spi_flash_test(W25QxObjectType *w25qx)
                 rData[i] = 0;
         }
 
-        if (w25qxx_write(w25qx,wData, 0x00, 0x100) == W25Qx_OK)
+        if (w25qxx_write(wData, 0x00, 0x100) == W25Qx_OK)
                 printf(" SPI Write ok\n");
         else
                 Error_Handler();
 
         /* 3- Read the flash */
-        if (w25qxx_read(w25qx,rData, 0x00, 0x100) == W25Qx_OK)
+        if (w25qxx_read(rData, 0x00, 0x100) == W25Qx_OK)
                 printf(" SPI Read ok\n");
         else
                 Error_Handler();

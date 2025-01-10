@@ -16,7 +16,7 @@
 
 #define SDA(bus)   HAL_GPIO_ReadPin(bus->SDA_Port, bus->SDA_Pin)
 
-#define Delay(bus) HAL_Delay_us(bus->Interval)
+#define Delay(bus) delay_us(bus->Interval)
 
 static GPIO_InitTypeDef GPIO_InitStruct = {
     .Pull  = GPIO_NOPULL,

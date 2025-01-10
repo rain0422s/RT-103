@@ -9,7 +9,7 @@ void loop2(u8g2_t *u8g2) {
         int y=1;                                              //Adjust displacement speed
         for(int x=0;x<256;x+=y){                              // x+=y ----->Equal x=x+y
                 u8g2_ClearBuffer(&u8g2);                      // Flush internal buffer
-                u8g2_SetFont(&u8g2, u8g2_font_4x6_tr);        // Set font
+                u8g2_SetFont(&u8g2, u8g2_font_luIS12_te);        // Set font
                 u8g2_DrawStr(&u8g2, x, 10, "Hello World!");
                 u8g2_DrawStr(&u8g2, x-128,10,"Hello World!");
                 delay_ms(20);                                 // Adjusting movement speed
@@ -162,15 +162,15 @@ void draw(u8g2_t *u8g2)
         u8g2_ClearBuffer(u8g2);
         u8g2_SetFontMode(u8g2, 1);              /*Font mode selection*/
         u8g2_SetFontDirection(u8g2, 0);         /*Font orientation selection*/
-        u8g2_SetFont(u8g2, u8g2_font_inb24_mf); /*Font selection*/
+        u8g2_SetFont(u8g2, u8g2_font_luIS12_te); /*Font selection*/
         u8g2_DrawStr(u8g2, 0, 20, "U");
 
         u8g2_SetFontDirection(u8g2, 1);
-        u8g2_SetFont(u8g2, u8g2_font_inb30_mn);
+        u8g2_SetFont(u8g2, u8g2_font_luIS12_te);
         u8g2_DrawStr(u8g2, 21,8,"8");
 
         u8g2_SetFontDirection(u8g2, 0);
-        u8g2_SetFont(u8g2, u8g2_font_inb24_mf);
+        u8g2_SetFont(u8g2, u8g2_font_luIS12_te);
         u8g2_DrawStr(u8g2, 51,30,"g");
         u8g2_DrawStr(u8g2, 67,30,"\xb2");
 
@@ -179,14 +179,14 @@ void draw(u8g2_t *u8g2)
         u8g2_DrawVLine(u8g2, 45, 32, 12);
         u8g2_DrawVLine(u8g2, 46, 33, 12);
 
-        u8g2_SetFont(u8g2, u8g2_font_4x6_tr);
+        u8g2_SetFont(u8g2, u8g2_font_luIS12_te);
         u8g2_DrawStr(u8g2, 1,54,"github.com/olikraus/u8g2");
         u8g2_SendBuffer(u8g2);
 }
 
 void loop(u8g2_t *u8g2) {
         u8g2_ClearBuffer(u8g2);
-        u8g2_SetFont(u8g2,u8g2_font_ncenB14_tr);
+        u8g2_SetFont(u8g2,u8g2_font_luIS12_te);
         u8g2_DrawStr(u8g2,0,20,"Hello World!");
         u8g2_SendBuffer(u8g2);
 }
@@ -212,8 +212,8 @@ void ui_test(u8g2_t u8g2){
         u8g2_SendBuffer(&u8g2);
 
 
-        u8g2_SetFont(&u8g2, u8g2_font_t0_22_mf);//设置字体	
-        frame_len = frame_len_trg = list[ui_select].len*13;
+        u8g2_SetFont(&u8g2, u8g2_font_luIS12_te);//设置字体	
+        frame_len = frame_len_trg = list[ui_select].len*12;
 }
 
 

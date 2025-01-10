@@ -6,11 +6,6 @@
 #define W25QXX_SPI hspi1
 #define CS_GPIO_Port  GPIOA
 #define CS_Pin        GPIO_PIN_4
-// Configuration
-typedef struct W25QxObject{
-        SPI_HandleTypeDef spi;         
-        uint32_t timeout;
-}W25QxObjectType;
 
 // 仅支持 128Mbits 及以下，因为 256Mbits 及以上的是 4字节地址
 
@@ -92,14 +87,14 @@ typedef struct W25QxObject{
 #define W25Qx_BUSY 0x02
 #define W25Qx_TIMEOUT 0x03
 
-uint8_t         w25qxx_init(W25QxObjectType *w25qx,SPI_HandleTypeDef spi,uint32_t timeout);
-static void     w25qxx_reset(W25QxObjectType *w25qx);
-static uint8_t  w25qxx_getstatus(W25QxObjectType *w25qx);
-uint8_t         w25qxx_write_enable(W25QxObjectType *w25qx);
-void            w25qxx_read_id(W25QxObjectType *w25qx,uint8_t* ID);
-uint8_t         w25qxx_read(W25QxObjectType *w25qx,uint8_t* pData, uint32_t ReadAddr, uint32_t Size);
-uint8_t         w25qxx_write(W25QxObjectType *w25qx,uint8_t* pData, uint32_t WriteAddr, uint32_t Size);
-uint8_t         w25qxx_erase_block(W25QxObjectType *w25qx,uint32_t Address);
-uint8_t         w25qxx_erase_chip(W25QxObjectType *w25qx);
+
+void     w25qxx_reset();
+uint8_t  w25qxx_getstatus();
+uint8_t         w25qxx_write_enable();
+void            w25qxx_read_id(uint8_t* ID);
+uint8_t         w25qxx_read(uint8_t* pData, uint32_t ReadAddr, uint32_t Size);
+uint8_t         w25qxx_write(uint8_t* pData, uint32_t WriteAddr, uint32_t Size);
+uint8_t         w25qxx_erase_block(uint32_t Address);
+uint8_t         w25qxx_erase_chip();
 
 #endif /* __W25QXX_H */

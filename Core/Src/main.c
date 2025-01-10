@@ -36,11 +36,15 @@
 #include "display.h"
 #include "sensor.h"
 #include "utils.h"
+#include "lfs.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-
+uint16_t adc_value[100];
+SHT3xObjectType sht;
+struct i2c_cli m24c02;
+u8g2_t u8g2;
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -77,6 +81,33 @@ void SystemClock_Config(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
+void ui_task(void* arg)
+{
+    while(1)
+    {
+        loop1(u8g2);
+        delay_ms(500);
+    }
+}
+
+void gesture_task(void* arg)
+{
+    while(1)
+    {
+        get_mpu6050_value();
+        delay_ms(300);
+    }
+}
+
+void sensor_task(void* arg)
+{
+    while(1)
+    {
+        get_sensor_value(sht,adc_value);
+        delay_ms(1000);
+    }
+}
+
 /* USER CODE END 0 */
 
 /**
@@ -86,11 +117,6 @@ void SystemClock_Config(void);
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-        uint16_t adc_value[100];
-        SHT3xObjectType sht;
-        W25QxObjectType w25qx;
-        struct i2c_cli m24c02;
-        u8g2_t u8g2;
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -126,7 +152,7 @@ int main(void)
         sensor_init(sht,adc_value,hadc1);
 
 
-        spi_flash_test(&w25qx);
+        spi_flash_test();
 
 
         i2c_eeprom_test(m24c02);
@@ -134,17 +160,24 @@ int main(void)
 
         ui_test(u8g2);
 
+        lfs_test();
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+
+        xTaskCreate(ui_task, "ui_task", 128, NULL, 5, NULL);
+
+
+        xTaskCreate(gesture_task, "gesture_task", 128, NULL, 4, NULL);
+
+
+        xTaskCreate(sensor_task, "sensor_task", 128, NULL, 3, NULL);
+
+        // 启动任务调度
+        vTaskStartScheduler();
+
   while (1){
-
-        loop1(u8g2);
-
-        get_mpu6050_value();
-
-        get_sensor_value(sht,adc_value);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */

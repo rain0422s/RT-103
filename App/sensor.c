@@ -38,16 +38,17 @@ uint8_t get_sensor_value(SHT3xObjectType sht,uint16_t *ADC_Value){
         adc /= 100;
 
         ADC_Vol =(float) adc/4096*3.3;
-        HAL_Delay(1);		
+        delay_ms(1);		
 
         printf("\r\n %f \r\n",ADC_Vol);
+
         printf("\r\n The adc value is %f \r\n",ADC_Vol);
-        HAL_Delay(300);
+        delay_ms(300);
 
         if (!sht3x_get_sensor_value(&sht))
                 printf("%4f, %4f\n", sht.temp, sht.rh);
 
-        HAL_Delay(500);
+        delay_ms(500);
       
 }
 
@@ -58,9 +59,9 @@ uint8_t get_sensor_value(SHT3xObjectType sht,uint16_t *ADC_Value){
  */
 void get_mpu6050_value(void)
 {
-        uint8_t ret;
+        uint8_t ret = 0;
 
-        uint8_t niming_report = 0;
+        // uint8_t niming_report = 0;
         float pit, rol, yaw;
         int16_t acc_x, acc_y, acc_z;
         int16_t gyr_x, gyr_y, gyr_z;

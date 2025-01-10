@@ -9,6 +9,6 @@ typedef struct {
     float f;
 } object_t;
 
-void spi_flash_test(W25QxObjectType *w25qx);
+void spi_flash_test();
 void i2c_eeprom_test(struct i2c_cli at24cxx);
 #endif
