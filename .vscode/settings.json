@@ -4,6 +4,7 @@
                 "*.wpy": "vue",
                 "*.wxml": "html",
                 "*.wxss": "css",
+                "*.hal": "c",
                 "crc8.h": "c",
                 "gpio.h": "c",
                 "i2c.h": "c",
@@ -36,6 +37,7 @@
                 "inttypes.h": "c",
                 "lfs.h": "c",
                 "task.h": "c",
-                "usart.h": "c"
+                "usart.h": "c",
+                "lis2dh12_reg.h": "c"
         }
 }

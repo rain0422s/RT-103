@@ -37,7 +37,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include "lis2dh12_reg.h"
 #include <string.h>
-
+#include <stdio.h>
 #define MKI109V2
 // #define NUCLEO_STM32F411RE
 
@@ -160,12 +160,13 @@ static int32_t platform_read(void *handle, uint8_t Reg, uint8_t *Bufp,
  */
 void tx_com( uint8_t *tx_buffer, uint16_t len )
 {
-  #ifdef NUCLEO_STM32F411RE  
-  HAL_UART_Transmit( &huart2, tx_buffer, len, 1000 );
-  #endif
-  #ifdef MKI109V2  
-  CDC_Transmit_FS( tx_buffer, len );
-  #endif
+#ifdef NUCLEO_STM32F411RE  
+        HAL_UART_Transmit( &huart2, tx_buffer, len, 1000 );
+#endif
+#ifdef MKI109V2  
+        //CDC_Transmit_FS( tx_buffer, len );
+        printf("[ line: %d | function: %s ]:%s\r\n", __LINE__, __FUNCTION__, tx_buffer);
+#endif
 }
 
 /* Main Example --------------------------------------------------------------*/
@@ -178,7 +179,7 @@ void example_main(void)
   lis2dh12_ctx_t dev_ctx;
   dev_ctx.write_reg = platform_write;
   dev_ctx.read_reg = platform_read;
-  dev_ctx.handle = &hi2c1;  
+  dev_ctx.handle = &hspi2;  
   /*
    *  Check device ID
    */

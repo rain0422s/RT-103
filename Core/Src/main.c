@@ -94,7 +94,8 @@ void gesture_task(void* arg)
 {
     while(1)
     {
-        get_mpu6050_value();
+        // get_mpu6050_value();
+        example_main();
         delay_ms(300);
     }
 }
