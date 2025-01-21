@@ -1,28 +1,15 @@
 #include "sensor.h"
 
 
- /**
-   * @brief   读取MPU6050的ID
-   * @param
-   * @retval 
-   */
-uint8_t MPU6050ReadID(void){
-        unsigned char Re = 0;
-        HAL_I2C_Mem_Read(&hi2c2, 0xd0, 0X75, 1, &Re, 1, 0xffff);
-        if (Re != 0x68) {
-                println("MPU6050 was not found\r\n");
-                return 0;
-        } else {
-                println("MPU6050 ID = %x\r\n",Re);
-                return 1;
-        }
 
-}
-
-uint8_t sensor_init(SHT3xObjectType sht,uint16_t* ADC_Value,ADC_HandleTypeDef adc){
+uint8_t sensor_init(SHT3xObjectType sht,uint16_t* ADC_Value,ADC_HandleTypeDef adc,lis2dh12_ctx_t dev_ctx){
         sht3x_init(&sht ,0x44,hi2c1);
+        lis2dh12_init(&dev_ctx);
+
         HAL_ADCEx_Calibration_Start(&adc);
+
         HAL_ADC_Start_DMA(&adc,(uint32_t*)&ADC_Value, 100);
+
         // mpu6050_init();
 }
 
@@ -50,6 +37,24 @@ uint8_t get_sensor_value(SHT3xObjectType sht,uint16_t *ADC_Value){
 
         delay_ms(500);
       
+}
+#ifdef MPU6050
+ /**
+   * @brief   读取MPU6050的ID
+   * @param
+   * @retval 
+   */
+uint8_t MPU6050ReadID(void){
+        unsigned char Re = 0;
+        HAL_I2C_Mem_Read(&hi2c2, 0xd0, 0X75, 1, &Re, 1, 0xffff);
+        if (Re != 0x68) {
+                println("MPU6050 was not found\r\n");
+                return 0;
+        } else {
+                println("MPU6050 ID = %x\r\n",Re);
+                return 1;
+        }
+
 }
 
 /**
@@ -125,3 +130,4 @@ uint8_t mpu6050_init(void){
                 // }
         }
 }
+#endif

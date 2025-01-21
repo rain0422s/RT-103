@@ -37,6 +37,7 @@
 #include "sensor.h"
 #include "utils.h"
 #include "lfs.h"
+#include "lis2dh12_reg.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -45,6 +46,7 @@ uint16_t adc_value[100];
 SHT3xObjectType sht;
 struct i2c_cli m24c02;
 u8g2_t u8g2;
+lis2dh12_ctx_t dev_ctx;
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -95,7 +97,7 @@ void gesture_task(void* arg)
     while(1)
     {
         // get_mpu6050_value();
-        example_main();
+        lis2dh12_read_data(dev_ctx);
         delay_ms(300);
     }
 }
@@ -150,7 +152,7 @@ int main(void)
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
 
-        sensor_init(sht,adc_value,hadc1);
+        sensor_init(sht,adc_value,hadc1,dev_ctx);
 
 
         spi_flash_test();

@@ -77,8 +77,7 @@ static uint8_t tx_buffer[TX_BUF_DIM];
  */
 
 static int32_t platform_write(void *handle, uint8_t Reg, uint8_t *Bufp,
-                              uint16_t len)
-{
+                              uint16_t len){
         if (handle == &hi2c1){
                 /* enable auto incremented in multiple read/write commands */
                 Reg |= 0x80; 
@@ -108,8 +107,7 @@ static int32_t platform_write(void *handle, uint8_t Reg, uint8_t *Bufp,
 }
 
 static int32_t platform_read(void *handle, uint8_t Reg, uint8_t *Bufp,
-                             uint16_t len)
-{
+                             uint16_t len){
         if (handle == &hi2c1){
                 /* enable auto incremented in multiple read/write commands */
                 Reg |= 0x80;
@@ -152,80 +150,78 @@ void tx_com( uint8_t *tx_buffer, uint16_t len )
 }
 
 /* Main Example --------------------------------------------------------------*/
-
-void example_main(void)
-{
-  /*
-   *  Initialize mems driver interface
-   */
-  lis2dh12_ctx_t dev_ctx;
-  dev_ctx.write_reg = platform_write;
-  dev_ctx.read_reg = platform_read;
-  dev_ctx.handle = &hspi2;  
-  /*
-   *  Check device ID
-   */
-  whoamI = 0;
-  lis2dh12_device_id_get(&dev_ctx, &whoamI);
-  if ( whoamI != LIS2DH12_ID )
-    while(1); /*manage here device not found */
-  /*
-   *  Enable Block Data Update
-   */
-  lis2dh12_block_data_update_set(&dev_ctx, PROPERTY_ENABLE);
-  /*
-   * Set Output Data Rate
-   */
-  lis2dh12_data_rate_set(&dev_ctx, LIS2DH12_ODR_1Hz);
-  /*
-   * Set full scale
-   */  
-  lis2dh12_full_scale_set(&dev_ctx, LIS2DH12_2g);
-  /*
-   * Enable temperature sensor
-   */   
-  lis2dh12_temperature_meas_set(&dev_ctx, LIS2DH12_TEMP_ENABLE);
-  /*
-   * Set device in continuos mode
-   */   
-  lis2dh12_operating_mode_set(&dev_ctx, LIS2DH12_HR_12bit);
-  
-  /*
-   * Read samples in polling mode (no int)
-   */
-  while(1)
-  {
-    /*
-     * Read output only if new value is available
-     */
-    lis2dh12_reg_t reg;
-    lis2dh12_status_get(&dev_ctx, &reg.status_reg);
-
-    if (reg.status_reg.zyxda)
-    {
-      /* Read magnetic field data */
-      memset(data_raw_acceleration.u8bit, 0x00, 3*sizeof(int16_t));
-      lis2dh12_acceleration_raw_get(&dev_ctx, data_raw_acceleration.u8bit);
-      acceleration_mg[0] = LIS2DH12_FROM_FS_2g_HR_TO_mg( data_raw_acceleration.i16bit[0] );
-      acceleration_mg[1] = LIS2DH12_FROM_FS_2g_HR_TO_mg( data_raw_acceleration.i16bit[1] );
-      acceleration_mg[2] = LIS2DH12_FROM_FS_2g_HR_TO_mg( data_raw_acceleration.i16bit[2] );
-      
-      sprintf((char*)tx_buffer, "Acceleration [mg]:%4.2f\t%4.2f\t%4.2f\r\n",
-              acceleration_mg[0], acceleration_mg[1], acceleration_mg[2]);
-      tx_com( tx_buffer, strlen( (char const*)tx_buffer ) );
-    }
-    
-    lis2dh12_temp_data_ready_get(&dev_ctx, &reg.byte);      
-    if (reg.byte)      
-    {
-      /* Read temperature data */
-      memset(data_raw_temperature.u8bit, 0x00, sizeof(int16_t));
-      lis2dh12_temperature_raw_get(&dev_ctx, data_raw_temperature.u8bit);
-      temperature_degC = LIS2DH12_FROM_LSB_TO_degC_HR( data_raw_temperature.i16bit );
+void lis2dh12_init(lis2dh12_ctx_t *dev_ctx){
+        /*
+        *  Initialize mems driver interface
+        */
        
-      sprintf((char*)tx_buffer, "Temperature [degC]:%6.2f\r\n", temperature_degC );
-      tx_com( tx_buffer, strlen( (char const*)tx_buffer ) );
-    }
-  }
+        // lis2dh12_ctx_t dev_ctx;
+
+        dev_ctx->write_reg = platform_write;
+        dev_ctx->read_reg = platform_read;
+        dev_ctx->handle = &hspi2;  
+        /*
+        *  Check device ID
+        */
+        whoamI = 0;
+        lis2dh12_device_id_get(dev_ctx, &whoamI);
+        if ( whoamI != LIS2DH12_ID )
+                while(1); /*manage here device not found */
+        /*
+        *  Enable Block Data Update
+        */
+        lis2dh12_block_data_update_set(dev_ctx, PROPERTY_ENABLE);
+        /*
+        * Set Output Data Rate
+        */
+        lis2dh12_data_rate_set(dev_ctx, LIS2DH12_ODR_1Hz);
+        /*
+        * Set full scale
+        */  
+        lis2dh12_full_scale_set(dev_ctx, LIS2DH12_2g);
+        /*
+        * Enable temperature sensor
+        */   
+        lis2dh12_temperature_meas_set(dev_ctx, LIS2DH12_TEMP_ENABLE);
+        /*
+        * Set device in continuos mode
+        */   
+        lis2dh12_operating_mode_set(dev_ctx, LIS2DH12_HR_12bit);
+
+}
+
+/*
+* Read samples in polling mode (no int)
+*/
+void lis2dh12_read_data(lis2dh12_ctx_t dev_ctx){
+        /*
+        * Read output only if new value is available
+        */
+        lis2dh12_reg_t reg;
+        lis2dh12_status_get(&dev_ctx, &reg.status_reg);
+
+        if(reg.status_reg.zyxda){
+                /* Read magnetic field data */
+                memset(data_raw_acceleration.u8bit, 0x00, 3*sizeof(int16_t));
+                lis2dh12_acceleration_raw_get(&dev_ctx, data_raw_acceleration.u8bit);
+                acceleration_mg[0] = LIS2DH12_FROM_FS_2g_HR_TO_mg( data_raw_acceleration.i16bit[0] );
+                acceleration_mg[1] = LIS2DH12_FROM_FS_2g_HR_TO_mg( data_raw_acceleration.i16bit[1] );
+                acceleration_mg[2] = LIS2DH12_FROM_FS_2g_HR_TO_mg( data_raw_acceleration.i16bit[2] );
+
+                sprintf((char*)tx_buffer, "Acceleration [mg]:%4.2f\t%4.2f\t%4.2f\r\n",
+                        acceleration_mg[0], acceleration_mg[1], acceleration_mg[2]);
+                tx_com( tx_buffer, strlen( (char const*)tx_buffer ) );
+        }
+
+        lis2dh12_temp_data_ready_get(&dev_ctx, &reg.byte);      
+        if(reg.byte){
+                /* Read temperature data */
+                memset(data_raw_temperature.u8bit, 0x00, sizeof(int16_t));
+                lis2dh12_temperature_raw_get(&dev_ctx, data_raw_temperature.u8bit);
+                temperature_degC = LIS2DH12_FROM_LSB_TO_degC_HR( data_raw_temperature.i16bit );
+
+                sprintf((char*)tx_buffer, "Temperature [degC]:%6.2f\r\n", temperature_degC );
+                tx_com( tx_buffer, strlen( (char const*)tx_buffer ) );
+        }
 }
 
