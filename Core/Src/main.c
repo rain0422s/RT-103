@@ -63,7 +63,17 @@ HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0,GPIO_PIN_RESET );\
 #define TURN_OFF_LED() do {                        \
 HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0,GPIO_PIN_SET );\
 } while(0)
-        
+
+
+// 简单的延时函数
+void simp_delay_ms(uint32_t ms) {
+    uint32_t i, j;
+    for (i = 0; i < ms; i++) {
+        for (j = 0; j < 7200; j++) {
+            __asm("NOP");  // 占位指令，防止优化
+        }
+    }
+}
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
@@ -120,6 +130,7 @@ void sensor_task(void* arg)
 int main(void)
 {
   /* USER CODE BEGIN 1 */
+simp_delay_ms(100);
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -135,7 +146,7 @@ int main(void)
   SystemClock_Config();
 
   /* USER CODE BEGIN SysInit */
-
+simp_delay_ms(100);
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */

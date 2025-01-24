@@ -6,6 +6,9 @@
 #include "stm32f1xx_hal.h"
 #include "FreeRTOS.h"
 #include "task.h"
+#include <stdio.h>
+#include <stdint.h>
+#include <stdbool.h>
 
 
 // static void HAL_Delay_us(uint32_t us)
@@ -55,9 +58,6 @@ static void os_delay_us(uint32_t nus)
 ///////////////////////////////////////////////// log
 
 
-#include <stdio.h>
-#include <stdint.h>
-#include <stdbool.h>
 
 // separator
 #define SEPARATOR30       "-----------------------------"

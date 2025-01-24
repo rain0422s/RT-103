@@ -39,6 +39,7 @@
                 "task.h": "c",
                 "usart.h": "c",
                 "lis2dh12_reg.h": "c",
-                "read_data_simple.h": "c"
+                "read_data_simple.h": "c",
+                "stdbool.h": "c"
         }
 }
