@@ -72,6 +72,7 @@
 // STM32的最低优先级
 #define configLIBRARY_LOWEST_INTERRUPT_PRIORITY   15
 
+#define configSUPPORT_DYNAMIC_ALLOCATION  1
 // 能够在中断服务函数中安全调用FreeRTOS API的中断最低优先级
 #define configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY 1
 
@@ -95,7 +96,7 @@
 #define INCLUDE_pcTaskGetTaskName               0
 #define INCLUDE_eTaskGetState                   0
 #define INCLUDE_xEventGroupSetBitFromISR        1
-#define INCLUDE_xTimerPendFunctionCall          0
+#define INCLUDE_xTimerPendFunctionCall          1
 
 #endif  /* FREERTOS_CONFIG_H__ */
 

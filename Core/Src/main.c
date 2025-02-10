@@ -23,6 +23,7 @@
 #include "i2c.h"
 #include "rtc.h"
 #include "spi.h"
+#include "tim.h"
 #include "usart.h"
 #include "usb.h"
 #include "gpio.h"
@@ -36,8 +37,10 @@
 #include "display.h"
 #include "sensor.h"
 #include "utils.h"
-#include "lfs.h"
-#include "lis2dh12_reg.h"
+// #include "lfs.h"
+#include "FreeRTOS.h"
+#include "event_groups.h"
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -46,7 +49,6 @@ uint16_t adc_value[100];
 SHT3xObjectType sht;
 struct i2c_cli m24c02;
 u8g2_t u8g2;
-lis2dh12_ctx_t dev_ctx;
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -64,22 +66,128 @@ HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0,GPIO_PIN_RESET );\
 HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0,GPIO_PIN_SET );\
 } while(0)
 
-
-// 简单的延时函数
-void simp_delay_ms(uint32_t ms) {
-    uint32_t i, j;
-    for (i = 0; i < ms; i++) {
-        for (j = 0; j < 7200; j++) {
-            __asm("NOP");  // 占位指令，防止优化
-        }
-    }
+#define ENABLE_DC(x) do{ x? \
+	                     HAL_GPIO_WritePin(GPIOC, GPIO_PIN_7, GPIO_PIN_SET): \
+	                     HAL_GPIO_WritePin(GPIOC, GPIO_PIN_7, GPIO_PIN_RESET); \
+                 } while(0)
+#define BULE_LED(x) do{ x? \
+	                     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, GPIO_PIN_RESET): \
+	                     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, GPIO_PIN_SET); \
+                 } while(0)
+void delay_us1(uint16_t time) {
+uint16_t i = 0;
+while(time--) {
+i = 10; // 自定义循环次数
+while(i--);
+}
 }
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
+uint16_t pwmVal=0;  
+uint8_t dir=1;   
 
+
+ 
+ 
+// static uint32_t send_data1=1;
+// static uint32_t send_data2=1;
+
+// 声明事件
+#define EVENT7 (0x01 << 6)
+
+
+        int flag =0;
+//任务控制权柄
+TaskHandle_t xHandleTsak[4];
+// 事件控制权柄
+EventGroupHandle_t myxEventGroupHandle_t = NULL;
+
+
+// void eventTask2(void)
+// {
+// 	// 设置变量接收事件
+// 	EventBits_t r_event;
+
+
+// 	while(1)
+// 	{
+
+// 		r_event = xEventGroupWaitBits(myxEventGroupHandle_t,EVENT7,
+// 									  pdTRUE,pdFALSE,portMAX_DELAY);
+
+// 		if((r_event&EVENT7) != 0)
+// 		{
+//                         // for(i=0;i<50;i++){
+                      
+//                                 if(HAL_GPIO_ReadPin(GPIOC ,GPIO_PIN_6) == 0){
+                                        
+//                                         flag =     1;
+//                                         printf("I do it1 %d\n",flag); 
+//                                 }else{
+//                                         flag =     0;
+//                                         printf("I am alive %d\n",flag); 
+                                      
+//                                 }
+                                        
+   
+// //                                         BULE_LED(0);
+// // ENABLE_DC(0);
+                       
+
+                            
+               
+        
+                        
+                       
+                        
+
+// 		}
+                 
+
+//                 portDISABLE_INTERRUPTS();
+
+                              
+               
+		
+// 	}
+// }
+
+
+
+
+// void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+// {
+
+// 	BaseType_t pxHigherPriorityTaskWoken; 
+// 	uint32_t ulReturn;
+// 	uint16_t event;
+	
+
+// 	ulReturn = taskENTER_CRITICAL_FROM_ISR();
+	
+
+// 	GPIO_PinState pinState = HAL_GPIO_ReadPin( GPIOC,GPIO_Pin );
+// 	if(pinState == GPIO_PIN_RESET )
+// 	{
+// 		// 判断中断位置
+// 		if(GPIO_Pin == GPIO_PIN_6 )
+// 		{
+// 			event = EVENT7;
+// 		}
+
+
+// 		xEventGroupSetBitsFromISR(myxEventGroupHandle_t,event,
+// 		&pxHigherPriorityTaskWoken);
+
+// 		portYIELD_FROM_ISR(pxHigherPriorityTaskWoken);
+// 	}
+	
+
+// 	taskEXIT_CRITICAL_FROM_ISR( ulReturn ); 	
+// }
 
 /* USER CODE END PV */
 
@@ -104,11 +212,27 @@ void ui_task(void* arg)
 
 void gesture_task(void* arg)
 {
+                static portTickType myPreviousWakeTime;
+          myPreviousWakeTime = xTaskGetTickCount();
     while(1)
     {
+        if(flag&&HAL_GPIO_ReadPin(GPIOC ,GPIO_PIN_6) == 0)
+        {
+                // BULE_LED(1);
+                printf("I will die \n");
+
+
+                            xTaskDelayUntil(&myPreviousWakeTime, pdMS_TO_TICKS(5000));
+                if(HAL_GPIO_ReadPin(GPIOC ,GPIO_PIN_6) == 0){
+                        printf("I am die\n");
+                        flag =0;
+                        BULE_LED(0);
+                        ENABLE_DC(0);
+                }
+
+        }
         // get_mpu6050_value();
-        lis2dh12_read_data(dev_ctx);
-        delay_ms(300);
+        delay_ms(1000);
     }
 }
 
@@ -116,8 +240,29 @@ void sensor_task(void* arg)
 {
     while(1)
     {
-        get_sensor_value(sht,adc_value);
+        printf("I am ailve\n");
+        // get_sensor_value(sht,adc_value);
+
         delay_ms(1000);
+
+
+	  while (pwmVal< 500)
+	  {
+		  pwmVal++;
+		  __HAL_TIM_SetCompare(&htim3, TIM_CHANNEL_4, pwmVal);    
+		//   TIM3->CCR1 = pwmVal;  
+
+                  delay_ms(1);
+	  }
+
+	  while (pwmVal)
+	  {
+		  pwmVal--;
+		  __HAL_TIM_SetCompare(&htim3, TIM_CHANNEL_4, pwmVal); 
+		//   TIM3->CCR1 = pwmVal;    
+
+                  delay_ms(1);
+	  }
     }
 }
 
@@ -130,7 +275,10 @@ void sensor_task(void* arg)
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-simp_delay_ms(100);
+delay_us1(10000);
+delay_us1(10000);
+delay_us1(10000);
+delay_us1(10000);       
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -146,7 +294,7 @@ simp_delay_ms(100);
   SystemClock_Config();
 
   /* USER CODE BEGIN SysInit */
-simp_delay_ms(100);
+
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
@@ -161,32 +309,51 @@ simp_delay_ms(100);
   MX_USART1_UART_Init();
   MX_USB_PCD_Init();
   MX_USART2_UART_Init();
+  MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
-
-        sensor_init(sht,adc_value,hadc1,dev_ctx);
-
-
-        spi_flash_test();
+  HAL_TIM_PWM_Start(&htim3,TIM_CHANNEL_4);
 
 
-        i2c_eeprom_test(m24c02);
+	
 
 
-        ui_test(u8g2);
+        // sensor_init(sht,adc_value,hadc1);
 
-        lfs_test();
+
+        // spi_flash_test();
+
+
+        // i2c_eeprom_test(m24c02);
+
+
+        // ui_test(u8g2);
+
+        // lfs_test();
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
 
-        xTaskCreate(ui_task, "ui_task", 128, NULL, 5, NULL);
+        // xTaskCreate(ui_task, "ui_task", 128, NULL, 5, NULL);
 
 
-        xTaskCreate(gesture_task, "gesture_task", 128, NULL, 4, NULL);
 
 
         xTaskCreate(sensor_task, "sensor_task", 128, NULL, 3, NULL);
+
+        // xTaskCreate(gesture_task, "gesture_task", 128, NULL, 1, NULL);
+	// xTaskCreate(
+	// 					(TaskFunction_t )eventTask2,(const char *)"task3",
+	// 					(uint16_t)128,(void*) NULL,1,&xHandleTsak[2]);
+								
+
+	
+	// // 创建事件
+	// myxEventGroupHandle_t = xEventGroupCreate();
+	// if(!myxEventGroupHandle_t)
+	// 	printf("event fail\n");
+	// else
+	// 	printf("event suc\n");
 
         // 启动任务调度
         vTaskStartScheduler();
