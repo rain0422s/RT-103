@@ -1,19 +1,19 @@
 /**
  ****************************************************************************************************
  * @file        atk_ms6050.c
- * @author      ÕıµãÔ­×ÓÍÅ¶Ó(ALIENTEK)
+ * @author      æ­£ç‚¹åŸå­å›¢é˜Ÿ(ALIENTEK)
  * @version     V1.0
  * @date        2022-06-21
- * @brief       ATK-MS6050Ä£¿éÇı¶¯´úÂë
- * @license     Copyright (c) 2020-2032, ¹ãÖİÊĞĞÇÒíµç×Ó¿Æ¼¼ÓĞÏŞ¹«Ë¾
+ * @brief       ATK-MS6050æ¨¡å—é©±åŠ¨ä»£ç 
+ * @license     Copyright (c) 2020-2032, å¹¿å·å¸‚æ˜Ÿç¿¼ç”µå­ç§‘æŠ€æœ‰é™å…¬å¸
  ****************************************************************************************************
  * @attention
  *
- * ÊµÑéÆ½Ì¨:ÕıµãÔ­×Ó STM32F103¿ª·¢°å
- * ÔÚÏßÊÓÆµ:www.yuanzige.com
- * ¼¼ÊõÂÛÌ³:www.openedv.com
- * ¹«Ë¾ÍøÖ·:www.alientek.com
- * ¹ºÂòµØÖ·:openedv.taobao.com
+ * å®éªŒå¹³å°:æ­£ç‚¹åŸå­ STM32F103å¼€å‘æ¿
+ * åœ¨çº¿è§†é¢‘:www.yuanzige.com
+ * æŠ€æœ¯è®ºå›:www.openedv.com
+ * å…¬å¸ç½‘å€:www.alientek.com
+ * è´­ä¹°åœ°å€:openedv.taobao.com
  *
  ****************************************************************************************************
  */
@@ -26,13 +26,13 @@
 
 
 /**
- * @brief       ÍùATK-MS6050µÄÖ¸¶¨¼Ä´æÆ÷Á¬ĞøĞ´ÈëÖ¸¶¨Êı¾İ
- * @param       addr: ATK-MS6050µÄIICÍ¨Ñ¶µØÖ·
- *              reg : ATK-MS6050¼Ä´æÆ÷µØÖ·
- *              len : Ğ´ÈëµÄ³¤¶È
- *              dat : Ğ´ÈëµÄÊı¾İ
- * @retval      ATK_MS6050_EOK : º¯ÊıÖ´ĞĞ³É¹¦
- *              ATK_MS6050_EACK: IICÍ¨Ñ¶ACK´íÎó£¬º¯ÊıÖ´ĞĞÊ§°Ü
+ * @brief       å¾€ATK-MS6050çš„æŒ‡å®šå¯„å­˜å™¨è¿ç»­å†™å…¥æŒ‡å®šæ•°æ®
+ * @param       addr: ATK-MS6050çš„IICé€šè®¯åœ°å€
+ *              reg : ATK-MS6050å¯„å­˜å™¨åœ°å€
+ *              len : å†™å…¥çš„é•¿åº¦
+ *              dat : å†™å…¥çš„æ•°æ®
+ * @retval      ATK_MS6050_EOK : å‡½æ•°æ‰§è¡ŒæˆåŠŸ
+ *              ATK_MS6050_EACK: IICé€šè®¯ACKé”™è¯¯ï¼Œå‡½æ•°æ‰§è¡Œå¤±è´¥
  */
 uint8_t atk_ms6050_write(uint8_t addr,uint8_t reg, uint8_t len, uint8_t *dat)
 {
@@ -69,12 +69,12 @@ uint8_t atk_ms6050_write(uint8_t addr,uint8_t reg, uint8_t len, uint8_t *dat)
 }
 
 /**
- * @brief       ÍùATK-MS6050µÄÖ¸¶¨¼Ä´æÆ÷Ğ´ÈëÒ»×Ö½ÚÊı¾İ
- * @param       addr: ATK-MS6050µÄIICÍ¨Ñ¶µØÖ·
- *              reg : ATK-MS6050¼Ä´æÆ÷µØÖ·
- *              dat : Ğ´ÈëµÄÊı¾İ
- * @retval      ATK_MS6050_EOK : º¯ÊıÖ´ĞĞ³É¹¦
- *              ATK_MS6050_EACK: IICÍ¨Ñ¶ACK´íÎó£¬º¯ÊıÖ´ĞĞÊ§°Ü
+ * @brief       å¾€ATK-MS6050çš„æŒ‡å®šå¯„å­˜å™¨å†™å…¥ä¸€å­—èŠ‚æ•°æ®
+ * @param       addr: ATK-MS6050çš„IICé€šè®¯åœ°å€
+ *              reg : ATK-MS6050å¯„å­˜å™¨åœ°å€
+ *              dat : å†™å…¥çš„æ•°æ®
+ * @retval      ATK_MS6050_EOK : å‡½æ•°æ‰§è¡ŒæˆåŠŸ
+ *              ATK_MS6050_EACK: IICé€šè®¯ACKé”™è¯¯ï¼Œå‡½æ•°æ‰§è¡Œå¤±è´¥
  */
 uint8_t atk_ms6050_write_byte(uint8_t addr, uint8_t reg, uint8_t dat)
 {
@@ -83,13 +83,13 @@ uint8_t atk_ms6050_write_byte(uint8_t addr, uint8_t reg, uint8_t dat)
 }
 
 /**
- * @brief       Á¬Ğø¶ÁÈ¡ATK-MS6050Ö¸¶¨¼Ä´æÆ÷µÄÖµ
- * @param       addr: ATK-MS6050µÄIICÍ¨Ñ¶µØÖ·
- *              reg : ATK-MS6050¼Ä´æÆ÷µØÖ·
- *              len: ¶ÁÈ¡µÄ³¤¶È
- *              dat: ´æ·Å¶ÁÈ¡µ½µÄÊı¾İµÄµØÖ·
- * @retval      ATK_MS6050_EOK : º¯ÊıÖ´ĞĞ³É¹¦
- *              ATK_MS6050_EACK: IICÍ¨Ñ¶ACK´íÎó£¬º¯ÊıÖ´ĞĞÊ§°Ü
+ * @brief       è¿ç»­è¯»å–ATK-MS6050æŒ‡å®šå¯„å­˜å™¨çš„å€¼
+ * @param       addr: ATK-MS6050çš„IICé€šè®¯åœ°å€
+ *              reg : ATK-MS6050å¯„å­˜å™¨åœ°å€
+ *              len: è¯»å–çš„é•¿åº¦
+ *              dat: å­˜æ”¾è¯»å–åˆ°çš„æ•°æ®çš„åœ°å€
+ * @retval      ATK_MS6050_EOK : å‡½æ•°æ‰§è¡ŒæˆåŠŸ
+ *              ATK_MS6050_EACK: IICé€šè®¯ACKé”™è¯¯ï¼Œå‡½æ•°æ‰§è¡Œå¤±è´¥
  */
 uint8_t atk_ms6050_read(uint8_t addr, uint8_t reg, uint8_t len, uint8_t *dat)
 {
@@ -129,12 +129,12 @@ uint8_t atk_ms6050_read(uint8_t addr, uint8_t reg, uint8_t len, uint8_t *dat)
 }
 
 /**
- * @brief       ¶ÁÈ¡ATK-MS6050Ö¸¶¨¼Ä´æÆ÷µÄÖµ
- * @param       addr: ATK-MS6050µÄIICÍ¨Ñ¶µØÖ·
- *              reg : ATK-MS6050¼Ä´æÆ÷µØÖ·
- *              dat: ¶ÁÈ¡µ½µÄ¼Ä´æÆ÷µÄÖµ
- * @retval      ATK_MS6050_EOK : º¯ÊıÖ´ĞĞ³É¹¦
- *              ATK_MS6050_EACK: IICÍ¨Ñ¶ACK´íÎó£¬º¯ÊıÖ´ĞĞÊ§°Ü
+ * @brief       è¯»å–ATK-MS6050æŒ‡å®šå¯„å­˜å™¨çš„å€¼
+ * @param       addr: ATK-MS6050çš„IICé€šè®¯åœ°å€
+ *              reg : ATK-MS6050å¯„å­˜å™¨åœ°å€
+ *              dat: è¯»å–åˆ°çš„å¯„å­˜å™¨çš„å€¼
+ * @retval      ATK_MS6050_EOK : å‡½æ•°æ‰§è¡ŒæˆåŠŸ
+ *              ATK_MS6050_EACK: IICé€šè®¯ACKé”™è¯¯ï¼Œå‡½æ•°æ‰§è¡Œå¤±è´¥
  */
 uint8_t atk_ms6050_read_byte(uint8_t addr, uint8_t reg, uint8_t *dat)
 {
@@ -143,9 +143,9 @@ uint8_t atk_ms6050_read_byte(uint8_t addr, uint8_t reg, uint8_t *dat)
 }
 
 /**
- * @brief       ATK-MS6050Èí¼ş¸´Î»
- * @param       ÎŞ
- * @retval      ÎŞ
+ * @brief       ATK-MS6050è½¯ä»¶å¤ä½
+ * @param       æ— 
+ * @retval      æ— 
  */
 void atk_ms6050_sw_reset(void)
 {
@@ -155,13 +155,13 @@ void atk_ms6050_sw_reset(void)
 }
 
 /**
- * @brief       ATK-MS6050ÉèÖÃÍÓÂİÒÇ´«¸ĞÆ÷Á¿³Ì·¶Î§
- * @param       frs: 0 --> ¡À250dps
- *                   1 --> ¡À500dps
- *                   2 --> ¡À1000dps
- *                   3 --> ¡À2000dps
- * @retval      ATK_MS6050_EOK : º¯ÊıÖ´ĞĞ³É¹¦
- *              ATK_MS6050_EACK: IICÍ¨Ñ¶ACK´íÎó£¬º¯ÊıÖ´ĞĞÊ§°Ü
+ * @brief       ATK-MS6050è®¾ç½®é™€èºä»ªä¼ æ„Ÿå™¨é‡ç¨‹èŒƒå›´
+ * @param       frs: 0 --> Â±250dps
+ *                   1 --> Â±500dps
+ *                   2 --> Â±1000dps
+ *                   3 --> Â±2000dps
+ * @retval      ATK_MS6050_EOK : å‡½æ•°æ‰§è¡ŒæˆåŠŸ
+ *              ATK_MS6050_EACK: IICé€šè®¯ACKé”™è¯¯ï¼Œå‡½æ•°æ‰§è¡Œå¤±è´¥
  */
 uint8_t atk_ms6050_set_gyro_fsr(uint8_t fsr)
 {
@@ -169,13 +169,13 @@ uint8_t atk_ms6050_set_gyro_fsr(uint8_t fsr)
 }
 
 /**
- * @brief       ATK-MS6050ÉèÖÃ¼ÓËÙ¶È´«¸ĞÆ÷Á¿³Ì·¶Î§
- * @param       frs: 0 --> ¡À2g
- *                   1 --> ¡À4g
- *                   2 --> ¡À8g
- *                   3 --> ¡À16g
- * @retval      ATK_MS6050_EOK : º¯ÊıÖ´ĞĞ³É¹¦
- *              ATK_MS6050_EACK: IICÍ¨Ñ¶ACK´íÎó£¬º¯ÊıÖ´ĞĞÊ§°Ü
+ * @brief       ATK-MS6050è®¾ç½®åŠ é€Ÿåº¦ä¼ æ„Ÿå™¨é‡ç¨‹èŒƒå›´
+ * @param       frs: 0 --> Â±2g
+ *                   1 --> Â±4g
+ *                   2 --> Â±8g
+ *                   3 --> Â±16g
+ * @retval      ATK_MS6050_EOK : å‡½æ•°æ‰§è¡ŒæˆåŠŸ
+ *              ATK_MS6050_EACK: IICé€šè®¯ACKé”™è¯¯ï¼Œå‡½æ•°æ‰§è¡Œå¤±è´¥
  */
 uint8_t atk_ms6050_set_accel_fsr(uint8_t fsr)
 {
@@ -183,10 +183,10 @@ uint8_t atk_ms6050_set_accel_fsr(uint8_t fsr)
 }
 
 /**
- * @brief       ATK-MS6050ÉèÖÃÊı×ÖµÍÍ¨ÂË²¨Æ÷ÆµÂÊ
- * @param       lpf: Êı×ÖµÍÍ¨ÂË²¨Æ÷µÄÆµÂÊ£¨Hz£©
- * @retval      ATK_MS6050_EOK : º¯ÊıÖ´ĞĞ³É¹¦
- *              ATK_MS6050_EACK: IICÍ¨Ñ¶ACK´íÎó£¬º¯ÊıÖ´ĞĞÊ§°Ü
+ * @brief       ATK-MS6050è®¾ç½®æ•°å­—ä½é€šæ»¤æ³¢å™¨é¢‘ç‡
+ * @param       lpf: æ•°å­—ä½é€šæ»¤æ³¢å™¨çš„é¢‘ç‡ï¼ˆHzï¼‰
+ * @retval      ATK_MS6050_EOK : å‡½æ•°æ‰§è¡ŒæˆåŠŸ
+ *              ATK_MS6050_EACK: IICé€šè®¯ACKé”™è¯¯ï¼Œå‡½æ•°æ‰§è¡Œå¤±è´¥
  */
 uint8_t atk_ms6050_set_lpf(uint16_t lpf)
 {
@@ -221,10 +221,10 @@ uint8_t atk_ms6050_set_lpf(uint16_t lpf)
 }
 
 /**
- * @brief       ATK-MS6050ÉèÖÃ²ÉÑùÂÊ
- * @param       rate: ²ÉÑùÂÊ£¨4~1000Hz£©
- * @retval      ATK_MS6050_EOK : º¯ÊıÖ´ĞĞ³É¹¦
- *              ATK_MS6050_EACK: IICÍ¨Ñ¶ACK´íÎó£¬º¯ÊıÖ´ĞĞÊ§°Ü
+ * @brief       ATK-MS6050è®¾ç½®é‡‡æ ·ç‡
+ * @param       rate: é‡‡æ ·ç‡ï¼ˆ4~1000Hzï¼‰
+ * @retval      ATK_MS6050_EOK : å‡½æ•°æ‰§è¡ŒæˆåŠŸ
+ *              ATK_MS6050_EACK: IICé€šè®¯ACKé”™è¯¯ï¼Œå‡½æ•°æ‰§è¡Œå¤±è´¥
  */
 uint8_t atk_ms6050_set_rate(uint16_t rate)
 {
@@ -258,10 +258,10 @@ uint8_t atk_ms6050_set_rate(uint16_t rate)
 }
 
 /**
- * @brief       ATK-MS6050»ñÈ¡ÎÂ¶ÈÖµ
- * @param       temperature: »ñÈ¡µ½µÄÎÂ¶ÈÖµ£¨À©´óÁË100±¶£©
- * @retval      ATK_MS6050_EOK : º¯ÊıÖ´ĞĞ³É¹¦
- *              ATK_MS6050_EACK: IICÍ¨Ñ¶ACK´íÎó£¬º¯ÊıÖ´ĞĞÊ§°Ü
+ * @brief       ATK-MS6050è·å–æ¸©åº¦å€¼
+ * @param       temperature: è·å–åˆ°çš„æ¸©åº¦å€¼ï¼ˆæ‰©å¤§äº†100å€ï¼‰
+ * @retval      ATK_MS6050_EOK : å‡½æ•°æ‰§è¡ŒæˆåŠŸ
+ *              ATK_MS6050_EACK: IICé€šè®¯ACKé”™è¯¯ï¼Œå‡½æ•°æ‰§è¡Œå¤±è´¥
  */
 uint8_t atk_ms6050_get_temperature(int16_t *temp)
 {
@@ -280,10 +280,10 @@ uint8_t atk_ms6050_get_temperature(int16_t *temp)
 }
 
 /**
- * @brief       ATK-MS6050»ñÈ¡ÍÓÂİÒÇÖµ
- * @param       gx£¬gy£¬gz: ÍÓÂİÒÇx¡¢y¡¢zÖáµÄÔ­Ê¼¶ÈÊı£¨´ø·ûºÅ£©
- * @retval      ATK_MS6050_EOK : º¯ÊıÖ´ĞĞ³É¹¦
- *              ATK_MS6050_EACK: IICÍ¨Ñ¶ACK´íÎó£¬º¯ÊıÖ´ĞĞÊ§°Ü
+ * @brief       ATK-MS6050è·å–é™€èºä»ªå€¼
+ * @param       gxï¼Œgyï¼Œgz: é™€èºä»ªxã€yã€zè½´çš„åŸå§‹åº¦æ•°ï¼ˆå¸¦ç¬¦å·ï¼‰
+ * @retval      ATK_MS6050_EOK : å‡½æ•°æ‰§è¡ŒæˆåŠŸ
+ *              ATK_MS6050_EACK: IICé€šè®¯ACKé”™è¯¯ï¼Œå‡½æ•°æ‰§è¡Œå¤±è´¥
  */
 uint8_t atk_ms6050_get_gyroscope(int16_t *gx, int16_t *gy, int16_t *gz)
 {
@@ -302,10 +302,10 @@ uint8_t atk_ms6050_get_gyroscope(int16_t *gx, int16_t *gy, int16_t *gz)
 }
 
 /**
- * @brief       ATK-MS6050»ñÈ¡¼ÓËÙ¶ÈÖµ
- * @param       ax£¬ay£¬az: ¼ÓËÙ¶Èx¡¢y¡¢zÖáµÄÔ­Ê¼¶ÈÊı£¨´ø·ûºÅ£©
- * @retval      ATK_MS6050_EOK : º¯ÊıÖ´ĞĞ³É¹¦
- *              ATK_MS6050_EACK: IICÍ¨Ñ¶ACK´íÎó£¬º¯ÊıÖ´ĞĞÊ§°Ü
+ * @brief       ATK-MS6050è·å–åŠ é€Ÿåº¦å€¼
+ * @param       axï¼Œayï¼Œaz: åŠ é€Ÿåº¦xã€yã€zè½´çš„åŸå§‹åº¦æ•°ï¼ˆå¸¦ç¬¦å·ï¼‰
+ * @retval      ATK_MS6050_EOK : å‡½æ•°æ‰§è¡ŒæˆåŠŸ
+ *              ATK_MS6050_EACK: IICé€šè®¯ACKé”™è¯¯ï¼Œå‡½æ•°æ‰§è¡Œå¤±è´¥
  */
 uint8_t atk_ms6050_get_accelerometer(int16_t *ax, int16_t *ay, int16_t *az)
 {
@@ -324,33 +324,33 @@ uint8_t atk_ms6050_get_accelerometer(int16_t *ax, int16_t *ay, int16_t *az)
 }
 
 /**
- * @brief       ATK-MS6050³õÊ¼»¯
- * @param       ÎŞ
- * @retval      ATK_MS6050_EOK: º¯ÊıÖ´ĞĞ³É¹¦
- *              ATK_MS6050_EID: »ñÈ¡ID´íÎó£¬º¯ÊıÖ´ĞĞÊ§°Ü
+ * @brief       ATK-MS6050åˆå§‹åŒ–
+ * @param       æ— 
+ * @retval      ATK_MS6050_EOK: å‡½æ•°æ‰§è¡ŒæˆåŠŸ
+ *              ATK_MS6050_EID: è·å–IDé”™è¯¯ï¼Œå‡½æ•°æ‰§è¡Œå¤±è´¥
  */
 uint8_t atk_ms6050_init(void)
 {
     uint8_t id;
     
-//     atk_ms6050_hw_init();                                                   /* ATK-MS6050Ó²¼ş³õÊ¼»¯ */
-//     atk_ms6050_iic_init();                                                  /* ³õÊ¼»¯IIC½Ó¿Ú */
-    atk_ms6050_sw_reset();                                                  /* ATK-MS050Èí¼ş¸´Î» */
-    atk_ms6050_set_gyro_fsr(3);                                             /* ÍÓÂİÒÇ´«¸ĞÆ÷£¬¡À2000dps */
-    atk_ms6050_set_accel_fsr(0);                                            /* ¼ÓËÙ¶È´«¸ĞÆ÷£¬¡À2g */
-    atk_ms6050_set_rate(50);                                                /* ²ÉÑùÂÊ£¬50Hz */
-    atk_ms6050_write_byte(ATK_MS6050_IIC_ADDR, MPU_INT_EN_REG, 0X00);       /* ¹Ø±ÕËùÓĞÖĞ¶Ï */
-    atk_ms6050_write_byte(ATK_MS6050_IIC_ADDR, MPU_USER_CTRL_REG, 0X00);    /* ¹Ø±ÕIICÖ÷Ä£Ê½ */
-    atk_ms6050_write_byte(ATK_MS6050_IIC_ADDR, MPU_FIFO_EN_REG, 0X00);      /* ¹Ø±ÕFIFO */
-    atk_ms6050_write_byte(ATK_MS6050_IIC_ADDR, MPU_INTBP_CFG_REG, 0X80);    /* INTÒı½ÅµÍµçÆ½ÓĞĞ§ */
-    atk_ms6050_read_byte(ATK_MS6050_IIC_ADDR, MPU_DEVICE_ID_REG, &id);      /* ¶ÁÈ¡Éè±¸ID */
+//     atk_ms6050_hw_init();                                                   /* ATK-MS6050ç¡¬ä»¶åˆå§‹åŒ– */
+//     atk_ms6050_iic_init();                                                  /* åˆå§‹åŒ–IICæ¥å£ */
+    atk_ms6050_sw_reset();                                                  /* ATK-MS050è½¯ä»¶å¤ä½ */
+    atk_ms6050_set_gyro_fsr(3);                                             /* é™€èºä»ªä¼ æ„Ÿå™¨ï¼ŒÂ±2000dps */
+    atk_ms6050_set_accel_fsr(0);                                            /* åŠ é€Ÿåº¦ä¼ æ„Ÿå™¨ï¼ŒÂ±2g */
+    atk_ms6050_set_rate(50);                                                /* é‡‡æ ·ç‡ï¼Œ50Hz */
+    atk_ms6050_write_byte(ATK_MS6050_IIC_ADDR, MPU_INT_EN_REG, 0X00);       /* å…³é—­æ‰€æœ‰ä¸­æ–­ */
+    atk_ms6050_write_byte(ATK_MS6050_IIC_ADDR, MPU_USER_CTRL_REG, 0X00);    /* å…³é—­IICä¸»æ¨¡å¼ */
+    atk_ms6050_write_byte(ATK_MS6050_IIC_ADDR, MPU_FIFO_EN_REG, 0X00);      /* å…³é—­FIFO */
+    atk_ms6050_write_byte(ATK_MS6050_IIC_ADDR, MPU_INTBP_CFG_REG, 0X80);    /* INTå¼•è„šä½ç”µå¹³æœ‰æ•ˆ */
+    atk_ms6050_read_byte(ATK_MS6050_IIC_ADDR, MPU_DEVICE_ID_REG, &id);      /* è¯»å–è®¾å¤‡ID */
     if (id != 0x68)
     {
         return ATK_MS6050_EID;
     }
-    atk_ms6050_write_byte(ATK_MS6050_IIC_ADDR, MPU_PWR_MGMT1_REG, 0x01);    /* ÉèÖÃCLKSEL£¬PLL XÖáÎª²Î¿¼ */
-    atk_ms6050_write_byte(ATK_MS6050_IIC_ADDR, MPU_PWR_MGMT2_REG, 0x00);    /* ¼ÓËÙ¶ÈÓëÍÓÂİÒÇ¶¼¹¤×÷ */
-    atk_ms6050_set_rate(50);                                                /* ²ÉÑùÂÊ£¬50Hz */
+    atk_ms6050_write_byte(ATK_MS6050_IIC_ADDR, MPU_PWR_MGMT1_REG, 0x01);    /* è®¾ç½®CLKSELï¼ŒPLL Xè½´ä¸ºå‚è€ƒ */
+    atk_ms6050_write_byte(ATK_MS6050_IIC_ADDR, MPU_PWR_MGMT2_REG, 0x00);    /* åŠ é€Ÿåº¦ä¸é™€èºä»ªéƒ½å·¥ä½œ */
+    atk_ms6050_set_rate(50);                                                /* é‡‡æ ·ç‡ï¼Œ50Hz */
     
     return ATK_MS6050_EOK;
 }
