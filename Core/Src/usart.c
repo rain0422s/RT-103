@@ -21,34 +21,51 @@
 #include "usart.h"
 
 /* USER CODE BEGIN 0 */
+// int _write(int fd, char *ptr, int len)
+// {
+// HAL_UART_Transmit(&huart1, (uint8_t*)ptr, len, 0xFFFF);
+// return len;
+// }
 #ifdef __GNUC__
-/* With GCC, small printf (option LD Linker->Libraries->Small printf
-   set to 'Yes') calls __io_putchar() */
 #define PUTCHAR_PROTOTYPE int __io_putchar(int ch)
 #else
 #define PUTCHAR_PROTOTYPE int fputc(int ch, FILE *f)
-#endif /* __GNUC__ */
-int fputc(int ch,FILE * f)
+#endif
+//STM32cubeIDE下
+PUTCHAR_PROTOTYPE
 {
-	HAL_UART_Transmit(&huart1,(uint8_t *)&ch,1,0xffff);
-	return ch;
-}
-int fgetc(FILE * f)
-{
-	uint8_t ch=0;
-	HAL_UART_Receive(&huart1,&ch,1,0xffff);
-	return ch;
+    HAL_UART_Transmit(&huart1 , (uint8_t *)&ch, 1,0x200);
+    return ch;
 }
 
-__attribute__((weak)) int _write(int file, char *ptr, int len)
-{
-        // arbitrary timeout 1000
-        HAL_StatusTypeDef status = 
-                HAL_UART_Transmit(&huart1, (uint8_t*)ptr, len,0xffff);
+// #ifdef __GNUC__
+// /* With GCC, small printf (option LD Linker->Libraries->Small printf
+//    set to 'Yes') calls __io_putchar() */
+// #define PUTCHAR_PROTOTYPE int __io_putchar(int ch)
+// #else
+// #define PUTCHAR_PROTOTYPE int fputc(int ch, FILE *f)
+// #endif /* __GNUC__ */
+// int fputc(int ch,FILE * f)
+// {
+// 	HAL_UART_Transmit(&huart1,(uint8_t *)&ch,1,0xffff);
+// 	return ch;
+// }
+// int fgetc(FILE * f)
+// {
+// 	uint8_t ch=0;
+// 	HAL_UART_Receive(&huart1,&ch,1,0xffff);
+// 	return ch;
+// }
 
-        // return # of bytes written - as best we can tell
-        return (status == HAL_OK ? len : 0);
-}
+// __attribute__((weak)) int _write(int file, char *ptr, int len)
+// {
+//         // arbitrary timeout 1000
+//         HAL_StatusTypeDef status = 
+//                 HAL_UART_Transmit(&huart1, (uint8_t*)ptr, len,0xffff);
+
+//         // return # of bytes written - as best we can tell
+//         return (status == HAL_OK ? len : 0);
+// }
 /* USER CODE END 0 */
 
 UART_HandleTypeDef huart1;

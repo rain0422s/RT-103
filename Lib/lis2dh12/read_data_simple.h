@@ -22,7 +22,7 @@
 #include "gpio.h"
 #endif
 
-void lis2dh12_init(lis2dh12_ctx_t *dev_ctx);
-void lis2dh12_read_data(lis2dh12_ctx_t dev_ctx);
+void lis2dh12_init(stmdev_ctx_t *dev_ctx);
+void lis2dh12_read_data(stmdev_ctx_t *dev_ctx);
 #endif
 

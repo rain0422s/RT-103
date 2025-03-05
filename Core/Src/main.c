@@ -40,7 +40,7 @@
 // #include "lfs.h"
 #include "FreeRTOS.h"
 #include "event_groups.h"
-
+#include "read_data_simple.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -49,6 +49,8 @@ uint16_t adc_value[100];
 SHT3xObjectType sht;
 struct i2c_cli m24c02;
 u8g2_t u8g2;
+stmdev_ctx_t dev_ctx;
+uint8_t whoamI = 0;
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -74,12 +76,13 @@ HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0,GPIO_PIN_SET );\
 	                     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, GPIO_PIN_RESET): \
 	                     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, GPIO_PIN_SET); \
                  } while(0)
-void delay_us1(uint16_t time) {
-uint16_t i = 0;
-while(time--) {
-i = 10; // 自定义循环次数
-while(i--);
-}
+                 
+void delay_us1(uint16_t time){
+        uint16_t i = 0;
+        while(time--) {
+                i = 10; // 自定义循环次数
+                while(i--);
+        }
 }
 /* USER CODE END PM */
 
@@ -237,13 +240,17 @@ void gesture_task(void* arg)
 }
 
 void sensor_task(void* arg)
-{
+{ 
+        lis2dh12_init(&dev_ctx);
     while(1)
     {
+      //  printf("v=%6.3f\n\r",0.3333);
+        // lis2dh12_device_id_get(&dev_ctx, &whoamI);
+        // printf("I read whoamI:0x%x\n",whoamI);
         printf("I am ailve\n");
         // get_sensor_value(sht,adc_value);
-
-        delay_ms(1000);
+       lis2dh12_read_data(&dev_ctx);
+        delay_ms(2000);
 
 
 	  while (pwmVal< 500)
@@ -274,11 +281,9 @@ void sensor_task(void* arg)
   */
 int main(void)
 {
+
   /* USER CODE BEGIN 1 */
-delay_us1(10000);
-delay_us1(10000);
-delay_us1(10000);
-delay_us1(10000);       
+ 
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -339,7 +344,7 @@ delay_us1(10000);
 
 
 
-        xTaskCreate(sensor_task, "sensor_task", 128, NULL, 3, NULL);
+        xTaskCreate(sensor_task, "sensor_task", 256, NULL, 3, NULL);
 
         // xTaskCreate(gesture_task, "gesture_task", 128, NULL, 1, NULL);
 	// xTaskCreate(

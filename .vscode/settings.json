@@ -40,6 +40,7 @@
                 "usart.h": "c",
                 "lis2dh12_reg.h": "c",
                 "read_data_simple.h": "c",
-                "stdbool.h": "c"
+                "stdbool.h": "c",
+                "event_groups.h": "c"
         }
 }

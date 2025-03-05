@@ -63,7 +63,7 @@ static float acceleration_mg[3];
 static float temperature_degC;
 static uint8_t whoamI;
 static uint8_t tx_buffer[TX_BUF_DIM];
-
+lis2dh12_op_md_t val = 0;
 /* Extern variables ----------------------------------------------------------*/
 
 /* Private functions ---------------------------------------------------------*/
@@ -108,6 +108,7 @@ static int32_t platform_write(void *handle, uint8_t Reg, uint8_t *Bufp,
 
 static int32_t platform_read(void *handle, uint8_t Reg, uint8_t *Bufp,
                              uint16_t len){
+                                
         if (handle == &hi2c1){
                 /* enable auto incremented in multiple read/write commands */
                 Reg |= 0x80;
@@ -115,7 +116,7 @@ static int32_t platform_read(void *handle, uint8_t Reg, uint8_t *Bufp,
                                 I2C_MEMADD_SIZE_8BIT, Bufp, len, 1000);
         }
         #ifdef MKI109V2   
-        else if (handle == &hspi2){
+        else if (handle == &hspi2){               
                 /* enable auto incremented in multiple read/write commands */
                 Reg |= 0xC0;
                 HAL_GPIO_WritePin(CS_SPI2_GPIO_Port, CS_SPI2_Pin, GPIO_PIN_RESET);
@@ -131,7 +132,7 @@ static int32_t platform_read(void *handle, uint8_t Reg, uint8_t *Bufp,
                 HAL_GPIO_WritePin(CS_SPI1_GPIO_Port, CS_SPI1_Pin, GPIO_PIN_SET);
         }
         #endif
-
+// printf("I do platform_read cmd:%x,str:%s\n",Reg,Bufp);
         return 0;
 }
 
@@ -150,12 +151,12 @@ void tx_com( uint8_t *tx_buffer, uint16_t len )
 }
 
 /* Main Example --------------------------------------------------------------*/
-void lis2dh12_init(lis2dh12_ctx_t *dev_ctx){
+void lis2dh12_init(stmdev_ctx_t *dev_ctx){
         /*
         *  Initialize mems driver interface
         */
-       
-        // lis2dh12_ctx_t dev_ctx;
+       printf("I to lis2dh12_init\n");
+        // stmdev_ctx_t dev_ctx;
 
         dev_ctx->write_reg = platform_write;
         dev_ctx->read_reg = platform_read;
@@ -164,9 +165,50 @@ void lis2dh12_init(lis2dh12_ctx_t *dev_ctx){
         *  Check device ID
         */
         whoamI = 0;
+        printf("I to lis2dh12_init1111111111\n");
+        printf("I noread whoamI:0x%x\n",whoamI);
         lis2dh12_device_id_get(dev_ctx, &whoamI);
         if ( whoamI != LIS2DH12_ID )
                 while(1); /*manage here device not found */
+                printf("I read whoamI:0x%x\n",whoamI);
+
+
+        
+	// lis2dh12_iic_write_byte(0x20, 0x37);	/* CTRL_REG1(20h): 关闭sensor，设置进入掉电模式 ODR 25HZ */
+        // //	lis2dh12_iic_write_byte(0x20, 0x57);	/* CTRL_REG1(20h): 关闭sensor，设置进入低功耗模式 ODR 100HZ */
+        //         lis2dh12_iic_write_byte(0x21, 0x03);	/* CTRL_REG2(21h): IA1、IA2 开启高通滤波 bc */
+        //         lis2dh12_iic_write_byte(0x22, 0xc0);	/* CTRL_REG3(22h): 0x80 使能单击中断到INT_1 INT_2 */
+        //         lis2dh12_iic_write_byte(0x23, 0x88);  /* CTRL_REG4(23h): 使能快，数据更新，全量程+/-2G，非常精度模式 */
+        // //	lis2dh12_iic_write_byte(0x25, 0x00);  /* CTRL_REG6(25h): 高电平(上升沿)触发中断 */
+                
+        //         /* INT1 翻转检测，中断*/							//0x6a
+        //         lis2dh12_iic_write_byte(0x30, 0x7f);  /* INT1_CFG(30h): 使能，6D X/Y/Z任一超过阈值中断 */
+        // //	lis2dh12_iic_write_byte(0x30, 0x4f);  /* INT1_CFG(30h): 使能，6D X/Y任一超过阈值中断 */
+        // //  lis2dh12_iic_write_byte(0x31, 0x20);  /* INT1_SRC(31h): 设置中断源 */
+         
+        //         lis2dh12_iic_write_byte(0x32, 0x02);  	/* INT1_THS(32h): 设置中断阀值 0x10: 16*2(FS)  0x20: 32*16(FS) */
+         
+        // //	lis2dh12_iic_write_byte(0x33, 0x02);  	/* INT1_DURATION(33h): 1LSB=1/ODR  如果ODR=25HZ  那么1LSB=40ms 设置延时 1s,对应25->0x19 */
+        // //	lis2dh12_iic_write_byte(0x33, 0x03);  /* INT1_DURATION(33h): 1LSB=1/ODR  如果ODR=50HZ   那么1LSB=20ms 设置延时 1s,对应50->0x32 */
+        //   lis2dh12_iic_write_byte(0x33, 0x03);  	/* INT1_DURATION(33h): 1LSB=1/ODR  如果ODR=100HZ  那么1LSB=10ms 设置延时 1s,对应100->0x64 */
+         
+                
+        // //	/* INT2 单击中断 */
+        //         lis2dh12_iic_write_byte(0x24, 0x01);	/* CTRL_REG5(24h):  */
+        // //	lis2dh12_iic_write_byte(0x25, 0xa0);  /* CTRL_REG6(25h): Click interrupt on INT2 pin */
+        // //
+        // //	lis2dh12_iic_write_byte(0x38, 0x15);	/* CLICK_CFG (38h): 单击识别中断使能 */
+        //         lis2dh12_iic_write_byte(0x39, 0x10);
+        // //	lis2dh12_iic_write_byte(0x3a, 0x7f);  /* CLICK_THS (3Ah): 单击阀值 */
+        // //	lis2dh12_iic_write_byte(0x3b, 0xff);  /* TIME_LIMIT (3Bh): 时间限制窗口6 ODR 1LSB=1/ODR 1LSB=1/100HZ,10ms,设置延时1s,对应100—>0x64*/
+        // //	lis2dh12_iic_write_byte(0x3c, 0xff);  /* TIME_LATENCY (3Ch): 中断电平持续时间1 ODR=10ms */
+        // //	lis2dh12_iic_write_byte(0x3d, 0x01);  /* TIME_WINDOW (3Dh):  单击时间窗口 */
+                
+        //         /* Start sensor */
+        // //	lis2dh12_iic_write_byte(0x20, 0x37);
+        //         lis2dh12_iic_write_byte(0x20, 0x5f);  /* CTRL_REG1(20h): Start sensor at ODR 100Hz Low-power mode */
+        
+
         /*
         *  Enable Block Data Update
         */
@@ -187,23 +229,27 @@ void lis2dh12_init(lis2dh12_ctx_t *dev_ctx){
         * Set device in continuos mode
         */   
         lis2dh12_operating_mode_set(dev_ctx, LIS2DH12_HR_12bit);
+        printf("I to lis2dh12_init33333333333\n");
+        lis2dh12_operating_mode_get(dev_ctx,&val);
+        printf("I to lis2dh12_operating_mode_get:%d\n",val);
 
 }
 
 /*
 * Read samples in polling mode (no int)
 */
-void lis2dh12_read_data(lis2dh12_ctx_t dev_ctx){
+void lis2dh12_read_data(stmdev_ctx_t *dev_ctx){
         /*
         * Read output only if new value is available
         */
         lis2dh12_reg_t reg;
-        lis2dh12_status_get(&dev_ctx, &reg.status_reg);
+        lis2dh12_status_get(dev_ctx, &reg.status_reg);
+        //printf("I to lis2dh12_read_data :%d\n",reg.status_reg.zyxda);
 
         if(reg.status_reg.zyxda){
                 /* Read magnetic field data */
                 memset(data_raw_acceleration.u8bit, 0x00, 3*sizeof(int16_t));
-                lis2dh12_acceleration_raw_get(&dev_ctx, data_raw_acceleration.u8bit);
+                lis2dh12_acceleration_raw_get(dev_ctx, data_raw_acceleration.u8bit);
                 acceleration_mg[0] = LIS2DH12_FROM_FS_2g_HR_TO_mg( data_raw_acceleration.i16bit[0] );
                 acceleration_mg[1] = LIS2DH12_FROM_FS_2g_HR_TO_mg( data_raw_acceleration.i16bit[1] );
                 acceleration_mg[2] = LIS2DH12_FROM_FS_2g_HR_TO_mg( data_raw_acceleration.i16bit[2] );
@@ -211,17 +257,20 @@ void lis2dh12_read_data(lis2dh12_ctx_t dev_ctx){
                 sprintf((char*)tx_buffer, "Acceleration [mg]:%4.2f\t%4.2f\t%4.2f\r\n",
                         acceleration_mg[0], acceleration_mg[1], acceleration_mg[2]);
                 tx_com( tx_buffer, strlen( (char const*)tx_buffer ) );
+                // printf("Acceleration [mg]:%4.2f\t%4.2f\t%4.2f\r\n",acceleration_mg[0], acceleration_mg[1], acceleration_mg[2]);
+                
         }
 
-        lis2dh12_temp_data_ready_get(&dev_ctx, &reg.byte);      
+        lis2dh12_temp_data_ready_get(dev_ctx, &reg.byte);      
         if(reg.byte){
                 /* Read temperature data */
                 memset(data_raw_temperature.u8bit, 0x00, sizeof(int16_t));
-                lis2dh12_temperature_raw_get(&dev_ctx, data_raw_temperature.u8bit);
+                lis2dh12_temperature_raw_get(dev_ctx, data_raw_temperature.u8bit);
                 temperature_degC = LIS2DH12_FROM_LSB_TO_degC_HR( data_raw_temperature.i16bit );
 
                 sprintf((char*)tx_buffer, "Temperature [degC]:%6.2f\r\n", temperature_degC );
                 tx_com( tx_buffer, strlen( (char const*)tx_buffer ) );
+                // printf("Temperature [degC]:%6.2f\r\n", temperature_degC );
         }
 }
 
