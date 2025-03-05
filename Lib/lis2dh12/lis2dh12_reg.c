@@ -340,12 +340,10 @@ int32_t lis2dh12_operating_mode_set(const stmdev_ctx_t *ctx,
 
   ret = lis2dh12_read_reg(ctx, LIS2DH12_CTRL_REG1,
                           (uint8_t *)&ctrl_reg1, 1);
-                          printf("I to lis2dh12_operating_mode_set1111111111\n");
   if (ret == 0)
   {
     ret = lis2dh12_read_reg(ctx, LIS2DH12_CTRL_REG4,
                             (uint8_t *)&ctrl_reg4, 1);
-                            printf("I to lis2dh12_operating_mode_set2222222\n");
   }
 
   if (ret == 0)
@@ -370,14 +368,12 @@ int32_t lis2dh12_operating_mode_set(const stmdev_ctx_t *ctx,
 
     ret = lis2dh12_write_reg(ctx, LIS2DH12_CTRL_REG1,
                              (uint8_t *)&ctrl_reg1, 1);
-                             printf("I to lis2dh12_operating_mode_set3333333\n");
   }
 
   if (ret == 0)
   {
     ret = lis2dh12_write_reg(ctx, LIS2DH12_CTRL_REG4,
                              (uint8_t *)&ctrl_reg4, 1);
-                             printf("I to lis2dh12_operating_mode_set44444444\n");
   }
 
   return ret;

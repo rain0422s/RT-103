@@ -66,6 +66,7 @@ PUTCHAR_PROTOTYPE
 //         // return # of bytes written - as best we can tell
 //         return (status == HAL_OK ? len : 0);
 // }
+
 /* USER CODE END 0 */
 
 UART_HandleTypeDef huart1;

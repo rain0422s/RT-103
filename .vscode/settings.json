@@ -41,6 +41,9 @@
                 "lis2dh12_reg.h": "c",
                 "read_data_simple.h": "c",
                 "stdbool.h": "c",
-                "event_groups.h": "c"
+                "event_groups.h": "c",
+                "array": "c",
+                "string": "c",
+                "string_view": "c"
         }
 }
