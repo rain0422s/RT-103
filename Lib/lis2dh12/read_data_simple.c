@@ -57,8 +57,7 @@
 #define TX_BUF_DIM          1000
 #define DEGREE_CAL 180.0/3.1416
 #define FILTER_CNT 4
-uint8_t tmp = 0;
- 
+
 typedef struct {
         short x;
         short y;
@@ -83,7 +82,7 @@ static float acceleration_mg[3];
 static float temperature_degC;
 static uint8_t whoamI;
 static uint8_t tx_buffer[TX_BUF_DIM];
-lis2dh12_op_md_t val = 0;
+#define M_PI 3.14159
 /* Extern variables ----------------------------------------------------------*/
 
 /* Private functions ---------------------------------------------------------*/
@@ -176,6 +175,7 @@ void lis2dh12_init(stmdev_ctx_t *dev_ctx){
         *  Initialize mems driver interface
         */
         // stmdev_ctx_t dev_ctx;
+        uint8_t val;
 
         dev_ctx->write_reg = platform_write;
         dev_ctx->read_reg = platform_read;
@@ -189,42 +189,13 @@ void lis2dh12_init(stmdev_ctx_t *dev_ctx){
                 while(1); /*manage here device not found */
 
 
-        
-	        lis2dh12_iic_write_byte(0x20, 0x37);	/* CTRL_REG1(20h): 关闭sensor，设置进入掉电模式 ODR 25HZ */
-        //	lis2dh12_iic_write_byte(0x20, 0x57);	/* CTRL_REG1(20h): 关闭sensor，设置进入低功耗模式 ODR 100HZ */
-                lis2dh12_iic_write_byte(0x21, 0x03);	/* CTRL_REG2(21h): IA1、IA2 开启高通滤波 bc */
-                lis2dh12_iic_write_byte(0x22, 0xc0);	/* CTRL_REG3(22h): 0x80 使能单击中断到INT_1 INT_2 */
-                lis2dh12_iic_write_byte(0x23, 0x88);  /* CTRL_REG4(23h): 使能快，数据更新，全量程+/-2G，非常精度模式 */
-        //	lis2dh12_iic_write_byte(0x25, 0x00);  /* CTRL_REG6(25h): 高电平(上升沿)触发中断 */
-                
-                /* INT1 翻转检测，中断*/							//0x6a
-                lis2dh12_iic_write_byte(0x30, 0x7f);  /* INT1_CFG(30h): 使能，6D X/Y/Z任一超过阈值中断 */
-        //	lis2dh12_iic_write_byte(0x30, 0x4f);  /* INT1_CFG(30h): 使能，6D X/Y任一超过阈值中断 */
-        //  lis2dh12_iic_write_byte(0x31, 0x20);  /* INT1_SRC(31h): 设置中断源 */
-         
-                lis2dh12_iic_write_byte(0x32, 0x02);  	/* INT1_THS(32h): 设置中断阀值 0x10: 16*2(FS)  0x20: 32*16(FS) */
-         
-        //	lis2dh12_iic_write_byte(0x33, 0x02);  	/* INT1_DURATION(33h): 1LSB=1/ODR  如果ODR=25HZ  那么1LSB=40ms 设置延时 1s,对应25->0x19 */
-        //	lis2dh12_iic_write_byte(0x33, 0x03);  /* INT1_DURATION(33h): 1LSB=1/ODR  如果ODR=50HZ   那么1LSB=20ms 设置延时 1s,对应50->0x32 */
-          lis2dh12_iic_write_byte(0x33, 0x03);  	/* INT1_DURATION(33h): 1LSB=1/ODR  如果ODR=100HZ  那么1LSB=10ms 设置延时 1s,对应100->0x64 */
-         
-                
-        //	/* INT2 单击中断 */
-                lis2dh12_iic_write_byte(0x24, 0x01);	/* CTRL_REG5(24h):  */
-        //	lis2dh12_iic_write_byte(0x25, 0xa0);  /* CTRL_REG6(25h): Click interrupt on INT2 pin */
-        //
-        //	lis2dh12_iic_write_byte(0x38, 0x15);	/* CLICK_CFG (38h): 单击识别中断使能 */
-                lis2dh12_iic_write_byte(0x39, 0x10);
-        //	lis2dh12_iic_write_byte(0x3a, 0x7f);  /* CLICK_THS (3Ah): 单击阀值 */
-        //	lis2dh12_iic_write_byte(0x3b, 0xff);  /* TIME_LIMIT (3Bh): 时间限制窗口6 ODR 1LSB=1/ODR 1LSB=1/100HZ,10ms,设置延时1s,对应100—>0x64*/
-        //	lis2dh12_iic_write_byte(0x3c, 0xff);  /* TIME_LATENCY (3Ch): 中断电平持续时间1 ODR=10ms */
-        //	lis2dh12_iic_write_byte(0x3d, 0x01);  /* TIME_WINDOW (3Dh):  单击时间窗口 */
-                
-                /* Start sensor */
-        //	lis2dh12_iic_write_byte(0x20, 0x37);
-                lis2dh12_iic_write_byte(0x20, 0x5f);  /* CTRL_REG1(20h): Start sensor at ODR 100Hz Low-power mode */
-        
+        lis2dh12_act_threshold_set(dev_ctx,0x0D);
+        val = 0x13;
+        lis2dh12_act_timeout_set(dev_ctx,0x13);
 
+        val = 0b00001010;;
+        lis2dh12_pin_int2_config_set(dev_ctx,&val);
+        
         /*
         *  Enable Block Data Update
         */
@@ -232,7 +203,7 @@ void lis2dh12_init(stmdev_ctx_t *dev_ctx){
         /*
         * Set Output Data Rate
         */
-        lis2dh12_data_rate_set(dev_ctx, LIS2DH12_ODR_1Hz);
+        lis2dh12_data_rate_set(dev_ctx, LIS2DH12_ODR_100Hz);
         /*
         * Set full scale
         */  
@@ -245,7 +216,7 @@ void lis2dh12_init(stmdev_ctx_t *dev_ctx){
         * Set device in continuos mode
         */   
         lis2dh12_operating_mode_set(dev_ctx, LIS2DH12_HR_12bit);
-
+        
 
 
 }
@@ -261,7 +232,6 @@ void lis2dh12_read_data(stmdev_ctx_t *dev_ctx){
 
         lis2dh12_reg_t reg;
 	uint8_t i = 0;
-      
 
                 lis2dh12_status_get(dev_ctx, &reg.status_reg);
         
@@ -287,15 +257,18 @@ void lis2dh12_read_data(stmdev_ctx_t *dev_ctx){
                         temperature_degC = LIS2DH12_FROM_LSB_TO_degC_HR( data_raw_temperature.i16bit );
         
                         sprintf((char*)tx_buffer, "Temperature [degC]:%6.2f\r\n", temperature_degC );
-                        // tx_com( tx_buffer, strlen( (char const*)tx_buffer ) );
+                        //tx_com( tx_buffer, strlen( (char const*)tx_buffer ) );
                 }
         
-
+                // float roll  = atan2(sample.y, sample.z) * (180.0 / M_PI);
+                // float pitch = atan2(-sample.x, sqrt(sample.y * sample.y + sample.z * sample.z)) * (180.0 / M_PI);
+                
 
                 sample.x = acceleration_mg[0]; 
 		sample.y = acceleration_mg[1];
 		sample.z = acceleration_mg[2];
 
+                //计算三轴旋转角度，但它不是传统的 Pitch/Roll 角，而是每个轴相对于其他两个轴的倾斜角。
                 sample.new_angle_x = atan((float)sample.x/(float)sqrt(pow(sample.y, 2)+pow(sample.z, 2))) * DEGREE_CAL;
                 sample.new_angle_y = atan((float)sample.y/(float)sqrt(pow(sample.x, 2)+pow(sample.z, 2))) * DEGREE_CAL;
                 sample.new_angle_z = atan((float)sample.z/(float)sqrt(pow(sample.x, 2)+pow(sample.y, 2))) * DEGREE_CAL;

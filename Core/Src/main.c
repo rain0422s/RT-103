@@ -244,12 +244,13 @@ void sensor_task(void* arg)
         lis2dh12_init(&dev_ctx);
     while(1)
     {
-      //  printf("v=%6.3f\n\r",0.3333);
-        // lis2dh12_device_id_get(&dev_ctx, &whoamI);
-        // printf("I read whoamI:0x%x\n",whoamI);
-        printf("I am ailve\n");
+
+        //printf("I am ailve\n");
         // get_sensor_value(sht,adc_value);
-       lis2dh12_read_data(&dev_ctx);
+        lis2dh12_read_data(&dev_ctx);
+        
+        printf("act_status:%d\n",HAL_GPIO_ReadPin(GPIOC ,GPIO_PIN_5));
+        printf("int1:%d\n",HAL_GPIO_ReadPin(GPIOB ,GPIO_PIN_0));
         delay_ms(2000);
 
 
@@ -283,7 +284,6 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
- 
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -361,7 +361,7 @@ int main(void)
 	// 	printf("event suc\n");
 
         // 启动任务调度
-        vTaskStartScheduler();
+       vTaskStartScheduler();
 
   while (1){
     /* USER CODE END WHILE */
