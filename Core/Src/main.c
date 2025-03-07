@@ -244,12 +244,19 @@ void sensor_task(void* arg)
     while(1)
     {
 
-        //printf("I am ailve\n");
+
         // get_sensor_value(sht,adc_value);
         lis2dh12_read_data(&dev_ctx);
-        
-        printf("act_status:%d\n",HAL_GPIO_ReadPin(GPIOC ,GPIO_PIN_5));
-        printf("int1:%d\n",HAL_GPIO_ReadPin(GPIOB ,GPIO_PIN_0));
+        //HAL_GPIO_ReadPin(GPIOB ,GPIO_PIN_0) INT1
+
+        if(!HAL_GPIO_ReadPin(GPIOC ,GPIO_PIN_5)){//check INT2
+                printf("I sleep\n");
+                BULE_LED(0);
+        }else{
+                printf("I am ailve\n");
+                BULE_LED(1);
+        }
+       
         delay_ms(2000);
 
 

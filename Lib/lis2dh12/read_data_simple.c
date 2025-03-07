@@ -188,10 +188,10 @@ void lis2dh12_init(stmdev_ctx_t *dev_ctx){
         if ( whoamI != LIS2DH12_ID )
                 while(1); /*manage here device not found */
 
+        //开启活动/不活动识别功能
+        lis2dh12_act_threshold_set(dev_ctx,0x0D);//加速度阈值:16 * 13 = 208 mg = 0.208 g
 
-        lis2dh12_act_threshold_set(dev_ctx,0x0D);
-        val = 0x13;
-        lis2dh12_act_timeout_set(dev_ctx,0x13);
+        lis2dh12_act_timeout_set(dev_ctx,0x19);//2.01s
 
         val = 0b00001010;;
         lis2dh12_pin_int2_config_set(dev_ctx,&val);
@@ -229,10 +229,9 @@ void lis2dh12_read_data(stmdev_ctx_t *dev_ctx){
         * Read output only if new value is available
         */
         axis_info_t sample;
-
         lis2dh12_reg_t reg;
 	uint8_t i = 0;
-
+        
                 lis2dh12_status_get(dev_ctx, &reg.status_reg);
         
                 if(reg.status_reg.zyxda){
