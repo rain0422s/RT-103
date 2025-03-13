@@ -276,7 +276,7 @@ void enable_fifo_bypass(stmdev_ctx_t *dev_ctx){
 }
 
 void enable_fifo(stmdev_ctx_t *dev_ctx){
-        u_int8_t val;
+
         //enable fifo
         lis2dh12_fifo_set(dev_ctx,1);
         //Activate Bypass mode
@@ -289,7 +289,7 @@ void enable_fifo(stmdev_ctx_t *dev_ctx){
 
 }
 void read_fifo(stmdev_ctx_t *dev_ctx){
-
+        u_int8_t val;
         lis2dh12_fifo_data_level_get(dev_ctx,&val);
         printf("fifo data level:%d",val);
         if(val == 30){
@@ -306,7 +306,7 @@ void read_fifo(stmdev_ctx_t *dev_ctx){
                         tx_com( tx_buffer, strlen( (char const*)tx_buffer ) );
                 }
 
-                
+
                 
         }
 
