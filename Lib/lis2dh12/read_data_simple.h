@@ -24,5 +24,9 @@
 
 void lis2dh12_init(stmdev_ctx_t *dev_ctx);
 void lis2dh12_read_data(stmdev_ctx_t *dev_ctx);
+void clear_init1(stmdev_ctx_t *dev_ctx);
+void enable_fifo_bypass(stmdev_ctx_t *dev_ctx);
+void enable_fifo(stmdev_ctx_t *dev_ctx);
+void read_fifo(stmdev_ctx_t *dev_ctx);
 #endif
 

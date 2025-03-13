@@ -241,6 +241,7 @@ void gesture_task(void* arg)
 void sensor_task(void* arg)
 { 
         lis2dh12_init(&dev_ctx);
+        enable_fifo(&dev_ctx);
     while(1)
     {
 
@@ -248,7 +249,8 @@ void sensor_task(void* arg)
         // get_sensor_value(sht,adc_value);
         lis2dh12_read_data(&dev_ctx);
         //HAL_GPIO_ReadPin(GPIOB ,GPIO_PIN_0) INT1
-
+        
+        read_fifo(&dev_ctx);
         if(!HAL_GPIO_ReadPin(GPIOC ,GPIO_PIN_5)){//check INT2
                 printf("I sleep\n");
                 BULE_LED(0);
@@ -256,7 +258,12 @@ void sensor_task(void* arg)
                 printf("I am ailve\n");
                 BULE_LED(1);
         }
-       
+        if(!HAL_GPIO_ReadPin(GPIOB ,GPIO_PIN_0)){//check INT1
+                printf("I get it\n");
+                clear_init1(&dev_ctx);
+        }else{
+                printf("I no get \n");
+        }
         delay_ms(2000);
 
 

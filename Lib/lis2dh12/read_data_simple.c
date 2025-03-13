@@ -169,6 +169,236 @@ void tx_com( uint8_t *tx_buffer, uint16_t len )
 #endif
 }
 
+uint8_t set_mg(stmdev_ctx_t *dev_ctx ,uint16_t mg){
+
+        uint8_t one_lsb;
+        uint16_t act_ths;
+
+        /*
+        1 LSb = 16 mg @ FS = 2 g
+        1 LSb = 32 mg @ FS = 4 g
+        1 LSb = 62 mg @ FS = 8 g
+        1 LSb = 186 mg @ FS = 16 g
+        */  
+        switch (dev_ctx->fs) {
+                case LIS2DH12_2g:
+                        one_lsb = 16;
+                        act_ths = (mg + (one_lsb >> 1)) >> 4;
+                        break;
+                case LIS2DH12_4g:
+                        one_lsb = 32;
+                        act_ths = (mg + (one_lsb >> 1)) >> 5;
+                        break;
+                case LIS2DH12_8g:
+                        one_lsb = 62;
+                        act_ths = (mg + (one_lsb / 2)) / one_lsb;
+                        break;
+                case LIS2DH12_16g:
+                        one_lsb = 186;
+                        act_ths = (mg + (one_lsb / 2)) / one_lsb;
+                        break;
+                default:
+                        return -1;
+        }
+
+        //限制act_ths在7位范围内（0 ~ 127）
+        if(act_ths > 0x7F){
+                act_ths = 0x7F;
+        }
+        // else if(act_ths < 0){
+        //         act_ths = 0;
+        // }
+
+        return act_ths;
+}
+
+uint8_t set_time(stmdev_ctx_t *dev_ctx ,uint16_t time){
+
+        uint8_t odr;
+        uint16_t act_dur;
+
+        switch (dev_ctx->odr) {
+                case LIS2DH12_ODR_1Hz:
+                        odr = 1;
+                        break;
+                case LIS2DH12_ODR_10Hz:
+                        odr = 10;
+                        break;
+                case LIS2DH12_ODR_25Hz:
+                        odr = 25;
+                        break;
+                case LIS2DH12_ODR_50Hz:
+                        odr = 50;
+                        break;
+                case LIS2DH12_ODR_100Hz:
+                        odr = 100;
+                        break;
+                case LIS2DH12_ODR_200Hz:
+                        odr = 200;
+                        break;
+                case LIS2DH12_ODR_400Hz:
+                        odr = 400;
+                        break;              
+                case LIS2DH12_ODR_1kHz620_LP:
+                        odr = 1620;
+                        break;     
+                case LIS2DH12_ODR_5kHz376_LP_1kHz344_NM_HP:
+                        if(dev_ctx->mode == LIS2DH12_LP_8bit)
+                                odr = 5376;
+                        else{
+                                odr = 1344;
+                        }
+                        break;            
+                default:
+                        return -1;
+        }
+
+        //除以 8 相当于右移 3 位 (>> 3)
+        act_dur = ((time * odr - 1) + 4)>> 3;
+
+        //限制act_ths在8位范围内（0 ~ 255）
+        if(act_dur > 0xFF){
+                act_dur = 0xFF;
+        }
+        return act_dur;
+}
+//Bypass Mode
+void enable_fifo_bypass(stmdev_ctx_t *dev_ctx){
+        uint8_t val;
+        lis2dh12_fifo_empty_flag_get(dev_ctx,&val);
+        printf("fifo_empty_flag:%d",val);
+        //enable fifo
+        // lis2dh12_fifo_set(dev_ctx,1);
+        //Activate Bypass mode
+        lis2dh12_fifo_mode_set(dev_ctx,LIS2DH12_BYPASS_MODE);
+        lis2dh12_fifo_empty_flag_get(dev_ctx,&val);
+        printf("fifo_empty_flag:%d",val);
+}
+
+void enable_fifo(stmdev_ctx_t *dev_ctx){
+        u_int8_t val;
+        //enable fifo
+        lis2dh12_fifo_set(dev_ctx,1);
+        //Activate Bypass mode
+        lis2dh12_fifo_mode_set(dev_ctx,LIS2DH12_FIFO_MODE);      
+        //FIFO overrun interrupt on INT1 pin.
+        // uint8_t ctrl_reg = 0x01;
+        // lis2dh12_write_reg(dev_ctx, LIS2DH12_CTRL_REG3,
+        //         (uint8_t *)&ctrl_reg, 1);
+
+
+}
+void read_fifo(stmdev_ctx_t *dev_ctx){
+
+        lis2dh12_fifo_data_level_get(dev_ctx,&val);
+        printf("fifo data level:%d",val);
+        if(val == 30){
+                for(int i = 0 ; i < 30 ; i++){
+                        /* Read magnetic field data */
+                        memset(data_raw_acceleration.u8bit, 0x00, 3*sizeof(int16_t));
+                        lis2dh12_acceleration_raw_get(dev_ctx, data_raw_acceleration.u8bit);
+                        acceleration_mg[0] = LIS2DH12_FROM_FS_2g_HR_TO_mg( data_raw_acceleration.i16bit[0] );
+                        acceleration_mg[1] = LIS2DH12_FROM_FS_2g_HR_TO_mg( data_raw_acceleration.i16bit[1] );
+                        acceleration_mg[2] = LIS2DH12_FROM_FS_2g_HR_TO_mg( data_raw_acceleration.i16bit[2] );
+
+                        sprintf((char*)tx_buffer, "Acceleration [mg]:%4.2f\t%4.2f\t%4.2f\r\n",
+                                acceleration_mg[0], acceleration_mg[1], acceleration_mg[2]);
+                        tx_com( tx_buffer, strlen( (char const*)tx_buffer ) );
+                }
+
+                
+                
+        }
+
+        
+        printf("read after fifo data level:%d",val); 
+}     
+//使能惯性中断唤醒
+void enable_inertial_wakeup(stmdev_ctx_t *dev_ctx){
+
+        uint8_t ctrl_reg;
+        // 1.将57h写入CTRL_REG1 // set ODR = 100 Hz 启动传感器，使能X、Y和Z
+        ctrl_reg = 0x57;
+        lis2dh12_write_reg(dev_ctx, LIS2DH12_CTRL_REG1,
+                                (uint8_t *)&ctrl_reg, 1);      
+        lis2dh12_read_reg(dev_ctx, LIS2DH12_CTRL_REG1,
+                                (uint8_t *)&ctrl_reg, 1);  
+        printf("CTRL_REG1:0x%x\n",ctrl_reg);
+
+        // 2.将09h写入CTRL_REG2 // 中断活动1已使能高通滤波器
+        ctrl_reg = 0x09;
+        //ctrl_reg = 0x00;
+        lis2dh12_write_reg(dev_ctx, LIS2DH12_CTRL_REG2,
+                (uint8_t *)&ctrl_reg, 1);      
+        lis2dh12_read_reg(dev_ctx, LIS2DH12_CTRL_REG2,
+                                (uint8_t *)&ctrl_reg, 1);  
+        printf("CTRL_REG2:0x%x\n",ctrl_reg);      
+
+        // 3.将40h写入CTRL_REG3 // 中断活动1挂载到INT1引脚上
+        ctrl_reg = 0x40;
+        lis2dh12_write_reg(dev_ctx, LIS2DH12_CTRL_REG3,
+                (uint8_t *)&ctrl_reg, 1);      
+        lis2dh12_read_reg(dev_ctx, LIS2DH12_CTRL_REG3,
+                                (uint8_t *)&ctrl_reg, 1);  
+        printf("CTRL_REG3:0x%x\n",ctrl_reg);  
+
+        // 4.将00h写入CTRL_REG4 // FS = ±2 g
+        ctrl_reg = 0x00;
+        lis2dh12_write_reg(dev_ctx, LIS2DH12_CTRL_REG4,
+                (uint8_t *)&ctrl_reg, 1);      
+        lis2dh12_read_reg(dev_ctx, LIS2DH12_CTRL_REG4,
+                                (uint8_t *)&ctrl_reg, 1);  
+        printf("CTRL_REG4:0x%x\n",ctrl_reg);  
+
+        // 5.将08h写入CTRL_REG5 // 中断1引脚已锁存
+        ctrl_reg = 0x08;
+        lis2dh12_write_reg(dev_ctx, LIS2DH12_CTRL_REG5,
+                (uint8_t *)&ctrl_reg, 1);      
+        lis2dh12_read_reg(dev_ctx, LIS2DH12_CTRL_REG5,
+                                (uint8_t *)&ctrl_reg, 1);  
+        printf("CTRL_REG5:0x%x\n",ctrl_reg); 
+
+        // 6.将10h写入INT1_THS // 阈值 = 250 mg
+        lis2dh12_int1_gen_threshold_set(dev_ctx,set_mg(dev_ctx,250));
+        lis2dh12_int1_gen_threshold_get(dev_ctx,&ctrl_reg);
+        printf("INT1_THS:0x%x\n",ctrl_reg);
+
+        // 7.将00h写入INT1_DURATION // 持续时间 = 0
+        lis2dh12_int1_gen_duration_set(dev_ctx,0x00);
+        lis2dh12_int1_gen_duration_get(dev_ctx,&ctrl_reg);
+        printf("INT1_DURATION:0x%x\n",ctrl_reg);
+
+        // 8.读取REFERENCE
+        // 进行虚拟读取，将高通滤波器强制设为当前加速度值
+        //（也就是设置参考加速度/倾斜值）
+        lis2dh12_filter_reference_get(dev_ctx,&ctrl_reg);
+
+        // 9.将2Ah写入INT1_CFG // 配置所需唤醒事件
+        ctrl_reg = 0x3F;
+        lis2dh12_int1_gen_conf_set(dev_ctx,&ctrl_reg);
+
+        // 10.轮询INT1焊盘；如果INT1=0，则转至9
+        // 轮询INT1引脚等待唤醒事件
+
+        // 11.（发生了唤醒事件；在此插入您的代码）// 事件处理
+
+        // 12.读INT1_SRC
+        // // 返回触发了中断
+        // // 中断并清除中断
+
+        // 13.（在此插入您的代码）// 事件处理
+        
+        // 14.转至9       
+}
+void clear_init1(stmdev_ctx_t *dev_ctx){
+        uint8_t ctrl_reg;
+        // ctrl_reg = 0x2A;
+        // lis2dh12_int1_gen_conf_set(dev_ctx,&ctrl_reg);
+        lis2dh12_int1_gen_source_get(dev_ctx,&ctrl_reg);
+        printf("INT1_SRC:0x%x\n",ctrl_reg);
+
+}
+
 /* Main Example --------------------------------------------------------------*/
 void lis2dh12_init(stmdev_ctx_t *dev_ctx){
         /*
@@ -176,10 +406,12 @@ void lis2dh12_init(stmdev_ctx_t *dev_ctx){
         */
         // stmdev_ctx_t dev_ctx;
         uint8_t val;
-
         dev_ctx->write_reg = platform_write;
-        dev_ctx->read_reg = platform_read;
-        dev_ctx->handle = &hspi2;  
+        dev_ctx->read_reg  = platform_read;
+        dev_ctx->handle    = &hspi2;
+        dev_ctx->fs        = LIS2DH12_2g;
+        dev_ctx->odr       = LIS2DH12_ODR_400Hz;
+        dev_ctx->mode      = LIS2DH12_HR_12bit;
         /*
         *  Check device ID
         */
@@ -188,37 +420,38 @@ void lis2dh12_init(stmdev_ctx_t *dev_ctx){
         if ( whoamI != LIS2DH12_ID )
                 while(1); /*manage here device not found */
 
+        enable_inertial_wakeup(dev_ctx);
+
         //开启活动/不活动识别功能
-        lis2dh12_act_threshold_set(dev_ctx,0x0D);//加速度阈值:16 * 13 = 208 mg = 0.208 g
-
-        lis2dh12_act_timeout_set(dev_ctx,0x19);//2.01s
-
-        val = 0b00001010;;
+        lis2dh12_act_threshold_set(dev_ctx,set_mg(dev_ctx,200));//加速度阈值:16 * 13 = 208 mg = 0.208 g
+        
+        lis2dh12_act_timeout_set(dev_ctx,set_time(dev_ctx,2));//2.01s
+        
+        val = 0b00001010;
         lis2dh12_pin_int2_config_set(dev_ctx,&val);
         
         /*
         *  Enable Block Data Update
         */
-        lis2dh12_block_data_update_set(dev_ctx, PROPERTY_ENABLE);
+        //lis2dh12_block_data_update_set(dev_ctx, PROPERTY_ENABLE);
         /*
         * Set Output Data Rate
         */
-        lis2dh12_data_rate_set(dev_ctx, LIS2DH12_ODR_100Hz);
+        //lis2dh12_data_rate_set(dev_ctx, dev_ctx->odr);
         /*
         * Set full scale
-        */  
-        lis2dh12_full_scale_set(dev_ctx, LIS2DH12_2g);
+        */      
+        //lis2dh12_full_scale_set(dev_ctx,dev_ctx->fs);
         /*
         * Enable temperature sensor
         */   
-        lis2dh12_temperature_meas_set(dev_ctx, LIS2DH12_TEMP_ENABLE);
+        //lis2dh12_temperature_meas_set(dev_ctx, LIS2DH12_TEMP_ENABLE);
         /*
         * Set device in continuos mode
         */   
-        lis2dh12_operating_mode_set(dev_ctx, LIS2DH12_HR_12bit);
+        lis2dh12_operating_mode_set(dev_ctx, dev_ctx->mode);
+
         
-
-
 }
 
 /*
@@ -231,7 +464,7 @@ void lis2dh12_read_data(stmdev_ctx_t *dev_ctx){
         axis_info_t sample;
         lis2dh12_reg_t reg;
 	uint8_t i = 0;
-        
+
                 lis2dh12_status_get(dev_ctx, &reg.status_reg);
         
                 if(reg.status_reg.zyxda){
@@ -244,7 +477,7 @@ void lis2dh12_read_data(stmdev_ctx_t *dev_ctx){
         
                         sprintf((char*)tx_buffer, "Acceleration [mg]:%4.2f\t%4.2f\t%4.2f\r\n",
                                 acceleration_mg[0], acceleration_mg[1], acceleration_mg[2]);
-                        // tx_com( tx_buffer, strlen( (char const*)tx_buffer ) );
+                        //tx_com( tx_buffer, strlen( (char const*)tx_buffer ) );
                         
                 }
         

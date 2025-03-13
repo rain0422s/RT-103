@@ -149,6 +149,35 @@ typedef int32_t (*stmdev_write_ptr)(void *, uint8_t, const uint8_t *, uint16_t);
 typedef int32_t (*stmdev_read_ptr)(void *, uint8_t, uint8_t *, uint16_t);
 typedef void (*stmdev_mdelay_ptr)(uint32_t millisec);
 
+typedef enum
+{
+  LIS2DH12_2g   = 0,
+  LIS2DH12_4g   = 1,
+  LIS2DH12_8g   = 2,
+  LIS2DH12_16g  = 3,
+} lis2dh12_fs_t;
+
+typedef enum
+{
+  LIS2DH12_POWER_DOWN                      = 0x00,
+  LIS2DH12_ODR_1Hz                         = 0x01,
+  LIS2DH12_ODR_10Hz                        = 0x02,
+  LIS2DH12_ODR_25Hz                        = 0x03,
+  LIS2DH12_ODR_50Hz                        = 0x04,
+  LIS2DH12_ODR_100Hz                       = 0x05,
+  LIS2DH12_ODR_200Hz                       = 0x06,
+  LIS2DH12_ODR_400Hz                       = 0x07,
+  LIS2DH12_ODR_1kHz620_LP                  = 0x08,
+  LIS2DH12_ODR_5kHz376_LP_1kHz344_NM_HP    = 0x09,
+} lis2dh12_odr_t;
+
+typedef enum
+{
+  LIS2DH12_HR_12bit   = 0,
+  LIS2DH12_NM_10bit   = 1,
+  LIS2DH12_LP_8bit    = 2,
+} lis2dh12_op_md_t;
+
 typedef struct
 {
   /** Component mandatory fields **/
@@ -158,6 +187,9 @@ typedef struct
   stmdev_mdelay_ptr   mdelay;
   /** Customizable optional pointer **/
   void *handle;
+  lis2dh12_fs_t fs;
+  lis2dh12_odr_t odr;
+  lis2dh12_op_md_t mode;
 } stmdev_ctx_t;
 
 /**
@@ -798,30 +830,13 @@ int32_t lis2dh12_temperature_meas_set(const stmdev_ctx_t *ctx,
 int32_t lis2dh12_temperature_meas_get(const stmdev_ctx_t *ctx,
                                       lis2dh12_temp_en_t *val);
 
-typedef enum
-{
-  LIS2DH12_HR_12bit   = 0,
-  LIS2DH12_NM_10bit   = 1,
-  LIS2DH12_LP_8bit    = 2,
-} lis2dh12_op_md_t;
+
 int32_t lis2dh12_operating_mode_set(const stmdev_ctx_t *ctx,
                                     lis2dh12_op_md_t val);
 int32_t lis2dh12_operating_mode_get(const stmdev_ctx_t *ctx,
                                     lis2dh12_op_md_t *val);
 
-typedef enum
-{
-  LIS2DH12_POWER_DOWN                      = 0x00,
-  LIS2DH12_ODR_1Hz                         = 0x01,
-  LIS2DH12_ODR_10Hz                        = 0x02,
-  LIS2DH12_ODR_25Hz                        = 0x03,
-  LIS2DH12_ODR_50Hz                        = 0x04,
-  LIS2DH12_ODR_100Hz                       = 0x05,
-  LIS2DH12_ODR_200Hz                       = 0x06,
-  LIS2DH12_ODR_400Hz                       = 0x07,
-  LIS2DH12_ODR_1kHz620_LP                  = 0x08,
-  LIS2DH12_ODR_5kHz376_LP_1kHz344_NM_HP    = 0x09,
-} lis2dh12_odr_t;
+
 int32_t lis2dh12_data_rate_set(const stmdev_ctx_t *ctx, lis2dh12_odr_t val);
 int32_t lis2dh12_data_rate_get(const stmdev_ctx_t *ctx,
                                lis2dh12_odr_t *val);
@@ -855,13 +870,7 @@ int32_t lis2dh12_high_pass_mode_set(const stmdev_ctx_t *ctx,
 int32_t lis2dh12_high_pass_mode_get(const stmdev_ctx_t *ctx,
                                     lis2dh12_hpm_t *val);
 
-typedef enum
-{
-  LIS2DH12_2g   = 0,
-  LIS2DH12_4g   = 1,
-  LIS2DH12_8g   = 2,
-  LIS2DH12_16g  = 3,
-} lis2dh12_fs_t;
+
 int32_t lis2dh12_full_scale_set(const stmdev_ctx_t *ctx, lis2dh12_fs_t val);
 int32_t lis2dh12_full_scale_get(const stmdev_ctx_t *ctx,
                                 lis2dh12_fs_t *val);

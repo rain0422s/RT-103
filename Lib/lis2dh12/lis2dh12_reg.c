@@ -916,7 +916,7 @@ int32_t lis2dh12_acceleration_raw_get(const stmdev_ctx_t *ctx, int16_t *val)
   uint8_t buff[6];
   int32_t ret;
 
-  ret = lis2dh12_read_reg(ctx, LIS2DH12_OUT_X_L, buff, 6);
+  ret = lis2dh12_read_reg(ctx, LIS2DH12_OUT_    X_L, buff, 6);
   val[0] = (int16_t)buff[1];
   val[0] = (val[0] * 256) + (int16_t)buff[0];
   val[1] = (int16_t)buff[3];
