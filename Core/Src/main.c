@@ -71,9 +71,10 @@ HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0,GPIO_PIN_SET );\
 	                     HAL_GPIO_WritePin(GPIOC, GPIO_PIN_7, GPIO_PIN_SET): \
 	                     HAL_GPIO_WritePin(GPIOC, GPIO_PIN_7, GPIO_PIN_RESET); \
                  } while(0)
+
 #define BULE_LED(x) do{ x? \
-	                     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, GPIO_PIN_RESET): \
-	                     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, GPIO_PIN_SET); \
+	                     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15, GPIO_PIN_RESET): \
+	                     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15, GPIO_PIN_SET); \
                  } while(0)
                  
 void delay_us1(uint16_t time){
@@ -112,48 +113,24 @@ EventGroupHandle_t myxEventGroupHandle_t = NULL;
 // {
 // 	// 设置变量接收事件
 // 	EventBits_t r_event;
-
-
 // 	while(1)
 // 	{
-
 // 		r_event = xEventGroupWaitBits(myxEventGroupHandle_t,EVENT7,
 // 									  pdTRUE,pdFALSE,portMAX_DELAY);
-
 // 		if((r_event&EVENT7) != 0)
 // 		{
-//                         // for(i=0;i<50;i++){
-                      
-//                                 if(HAL_GPIO_ReadPin(GPIOC ,GPIO_PIN_6) == 0){
-                                        
+//                         // for(i=0;i<50;i++){                    
+//                                 if(HAL_GPIO_ReadPin(GPIOC ,GPIO_PIN_6) == 0){                               
 //                                         flag =     1;
 //                                         printf("I do it1 %d\n",flag); 
 //                                 }else{
 //                                         flag =     0;
-//                                         printf("I am alive %d\n",flag); 
-                                      
+//                                         printf("I am alive %d\n",flag);                                   
 //                                 }
-                                        
-   
 // //                                         BULE_LED(0);
-// // ENABLE_DC(0);
-                       
-
-                            
-               
-        
-                        
-                       
-                        
-
-// 		}
-                 
-
-//                 portDISABLE_INTERRUPTS();
-
-                              
-               
-		
+// ENABLE_DC(0);                  
+// 		}            
+//                 portDISABLE_INTERRUPTS();		
 // 	}
 // }
 
@@ -162,15 +139,10 @@ EventGroupHandle_t myxEventGroupHandle_t = NULL;
 
 // void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 // {
-
 // 	BaseType_t pxHigherPriorityTaskWoken; 
 // 	uint32_t ulReturn;
 // 	uint16_t event;
-	
-
 // 	ulReturn = taskENTER_CRITICAL_FROM_ISR();
-	
-
 // 	GPIO_PinState pinState = HAL_GPIO_ReadPin( GPIOC,GPIO_Pin );
 // 	if(pinState == GPIO_PIN_RESET )
 // 	{
@@ -179,15 +151,10 @@ EventGroupHandle_t myxEventGroupHandle_t = NULL;
 // 		{
 // 			event = EVENT7;
 // 		}
-
-
 // 		xEventGroupSetBitsFromISR(myxEventGroupHandle_t,event,
 // 		&pxHigherPriorityTaskWoken);
-
 // 		portYIELD_FROM_ISR(pxHigherPriorityTaskWoken);
 // 	}
-	
-
 // 	taskEXIT_CRITICAL_FROM_ISR( ulReturn ); 	
 // }
 
@@ -240,50 +207,50 @@ void gesture_task(void* arg)
 
 void sensor_task(void* arg)
 { 
-        lis2dh12_init(&dev_ctx);
-        enable_fifo(&dev_ctx);
+        // lis2dh12_init(&dev_ctx);
+        // enable_fifo(&dev_ctx);
     while(1)
     {
 
 
         // get_sensor_value(sht,adc_value);
-        lis2dh12_read_data(&dev_ctx);
+        // lis2dh12_read_data(&dev_ctx);
         //HAL_GPIO_ReadPin(GPIOB ,GPIO_PIN_0) INT1
         
-        read_fifo(&dev_ctx);
-        if(!HAL_GPIO_ReadPin(GPIOC ,GPIO_PIN_5)){//check INT2
-                printf("I sleep\n");
-                BULE_LED(0);
-        }else{
-                printf("I am ailve\n");
-                BULE_LED(1);
-        }
-        if(!HAL_GPIO_ReadPin(GPIOB ,GPIO_PIN_0)){//check INT1
-                printf("I get it\n");
-                clear_init1(&dev_ctx);
-        }else{
-                printf("I no get \n");
-        }
-        delay_ms(2000);
+        // read_fifo(&dev_ctx);
+        // if(!HAL_GPIO_ReadPin(GPIOC ,GPIO_PIN_5)){//check INT2
+        //         printf("I sleep\n");
+        //         BULE_LED(0);
+        // }else{
+        //         printf("I am ailve\n");
+        //         BULE_LED(1);
+        // }
+        // if(!HAL_GPIO_ReadPin(GPIOB ,GPIO_PIN_0)){//check INT1
+        //         printf("I get it\n");
+        //         clear_init1(&dev_ctx);
+        // }else{
+        //         printf("I no get \n");
+        // }
+        // delay_ms(2000);
 
 
-	  while (pwmVal< 500)
-	  {
-		  pwmVal++;
-		  __HAL_TIM_SetCompare(&htim3, TIM_CHANNEL_4, pwmVal);    
-		//   TIM3->CCR1 = pwmVal;  
+	//   while (pwmVal< 500)
+	//   {
+	// 	  pwmVal++;
+	// 	  __HAL_TIM_SetCompare(&htim3, TIM_CHANNEL_4, pwmVal);    
+	// 	//   TIM3->CCR1 = pwmVal;  
 
-                  delay_ms(1);
-	  }
+        //           delay_ms(1);
+	//   }
 
-	  while (pwmVal)
-	  {
-		  pwmVal--;
-		  __HAL_TIM_SetCompare(&htim3, TIM_CHANNEL_4, pwmVal); 
-		//   TIM3->CCR1 = pwmVal;    
+	//   while (pwmVal)
+	//   {
+	// 	  pwmVal--;
+	// 	  __HAL_TIM_SetCompare(&htim3, TIM_CHANNEL_4, pwmVal); 
+	// 	//   TIM3->CCR1 = pwmVal;    
 
-                  delay_ms(1);
-	  }
+        //           delay_ms(1);
+	//   }
     }
 }
 
@@ -328,7 +295,7 @@ int main(void)
   MX_USART2_UART_Init();
   MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
-  HAL_TIM_PWM_Start(&htim3,TIM_CHANNEL_4);
+//   HAL_TIM_PWM_Start(&htim3,TIM_CHANNEL_4);
 
 
 	
