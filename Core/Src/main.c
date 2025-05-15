@@ -253,6 +253,15 @@ void sensor_task(void* arg)
 	//   }
     }
 }
+void dly_ms(uint32_t ms)
+{
+    // 每1毫秒大约需要循环72000次（72MHz / 1000）
+    // 一个for循环约消耗1个周期（估算），加倍保险系数为10
+    const uint32_t count_per_ms = 7200; // 实测可调
+    for (uint32_t i = 0; i < (ms * count_per_ms); i++) {
+        __NOP(); // 空操作，避免被优化掉
+    }
+}
 
 /* USER CODE END 0 */
 
@@ -262,7 +271,7 @@ void sensor_task(void* arg)
   */
 int main(void)
 {
-
+        dly_ms(100);
   /* USER CODE BEGIN 1 */
   /* USER CODE END 1 */
 
