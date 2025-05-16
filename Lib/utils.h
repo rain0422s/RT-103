@@ -49,7 +49,7 @@ static void os_delay_us(uint32_t nus)
 //systick定时器时钟，根据具体情况更改
 
 // #define delay_ms(ms) HAL_Delay(ms)
-#define delay_ms(ms) vTaskDelay(1);
+#define delay_ms(ms) vTaskDelay(ms);
 #define delay_us(us) os_delay_us(us)
 
 ///////////////////////////////////////////////// log

@@ -68,8 +68,8 @@ HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0,GPIO_PIN_SET );\
 } while(0)
 
 #define ENABLE_DC(x) do{ x? \
-	                     HAL_GPIO_WritePin(GPIOC, GPIO_PIN_7, GPIO_PIN_SET): \
-	                     HAL_GPIO_WritePin(GPIOC, GPIO_PIN_7, GPIO_PIN_RESET); \
+	                     HAL_GPIO_WritePin(GPIOC, GPIO_PIN_10, GPIO_PIN_RESET): \
+	                     HAL_GPIO_WritePin(GPIOC, GPIO_PIN_10, GPIO_PIN_SET); \
                  } while(0)
 
 #define BULE_LED(x) do{ x? \
@@ -181,25 +181,25 @@ void ui_task(void* arg)
 
 void gesture_task(void* arg)
 {
-                static portTickType myPreviousWakeTime;
-          myPreviousWakeTime = xTaskGetTickCount();
+        //         static portTickType myPreviousWakeTime;
+        //   myPreviousWakeTime = xTaskGetTickCount();
     while(1)
     {
-        if(flag&&HAL_GPIO_ReadPin(GPIOC ,GPIO_PIN_6) == 0)
-        {
-                // BULE_LED(1);
-                printf("I will die \n");
+        // if(flag&&HAL_GPIO_ReadPin(GPIOC ,GPIO_PIN_6) == 0)
+        // {
+        //         // BULE_LED(1);
+        //         printf("I will die \n");
 
 
-                            xTaskDelayUntil(&myPreviousWakeTime, pdMS_TO_TICKS(5000));
-                if(HAL_GPIO_ReadPin(GPIOC ,GPIO_PIN_6) == 0){
-                        printf("I am die\n");
-                        flag =0;
-                        BULE_LED(0);
-                        ENABLE_DC(0);
-                }
+        //                     xTaskDelayUntil(&myPreviousWakeTime, pdMS_TO_TICKS(5000));
+        //         if(HAL_GPIO_ReadPin(GPIOC ,GPIO_PIN_6) == 0){
+        //                 printf("I am die\n");
+        //                 flag =0;
+        BULE_LED(0);
+        ENABLE_DC(1);
+        //         }
 
-        }
+        // }
         // get_mpu6050_value();
         delay_ms(1000);
     }
@@ -212,7 +212,8 @@ void sensor_task(void* arg)
     while(1)
     {
 
-
+        BULE_LED(1);
+        ENABLE_DC(0);
         // get_sensor_value(sht,adc_value);
         // lis2dh12_read_data(&dev_ctx);
         //HAL_GPIO_ReadPin(GPIOB ,GPIO_PIN_0) INT1
@@ -231,7 +232,7 @@ void sensor_task(void* arg)
         // }else{
         //         printf("I no get \n");
         // }
-        // delay_ms(2000);
+        delay_ms(1000);
 
 
 	//   while (pwmVal< 500)
@@ -334,7 +335,7 @@ int main(void)
 
         xTaskCreate(sensor_task, "sensor_task", 256, NULL, 3, NULL);
 
-        // xTaskCreate(gesture_task, "gesture_task", 128, NULL, 1, NULL);
+        xTaskCreate(gesture_task, "gesture_task", 128, NULL, 1, NULL);
 	// xTaskCreate(
 	// 					(TaskFunction_t )eventTask2,(const char *)"task3",
 	// 					(uint16_t)128,(void*) NULL,1,&xHandleTsak[2]);

@@ -62,11 +62,6 @@ defined in linker script */
   .type Reset_Handler, %function
 Reset_Handler:
 
-/* 插入软件延时，大致约 200ms @72MHz（根据经验）*/
-  LDR   R1, =0x00FFFFFF  /*约等于 16,777,215 次循环*/
-delay_loop:
-  SUBS  R1, R1, #1
-  BNE   delay_loop
 /* Call the clock system initialization function.*/
     bl  SystemInit
 
