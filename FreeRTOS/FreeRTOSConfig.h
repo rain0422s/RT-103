@@ -10,7 +10,7 @@
 #define configUSE_TICKLESS_IDLE                 0
 
 // 系统时钟主频
-#define configCPU_CLOCK_HZ                      72000000
+#define configCPU_CLOCK_HZ                      72000000        
 
 // 系统节拍中断的频率，即1s进中断的次数，配置为1000就是一秒进1000次中断，系统节拍就是1s。
 #define configTICK_RATE_HZ                      1000

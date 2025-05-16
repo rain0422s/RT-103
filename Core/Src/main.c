@@ -59,13 +59,10 @@ uint8_t whoamI = 0;
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
-#define TURN_ON_LED() do {                           \
-HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0,GPIO_PIN_RESET );\
-} while(0)
-
-#define TURN_OFF_LED() do {                        \
-HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0,GPIO_PIN_SET );\
-} while(0)
+#define YELLOW_LED(x) do{ x? \
+	                     HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_RESET): \
+	                     HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_SET); \
+                 } while(0)
 
 #define ENABLE_DC(x) do{ x? \
 	                     HAL_GPIO_WritePin(GPIOC, GPIO_PIN_10, GPIO_PIN_RESET): \
@@ -76,23 +73,17 @@ HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0,GPIO_PIN_SET );\
 	                     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15, GPIO_PIN_RESET): \
 	                     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15, GPIO_PIN_SET); \
                  } while(0)
-                 
-void delay_us1(uint16_t time){
-        uint16_t i = 0;
-        while(time--) {
-                i = 10; // 自定义循环次数
-                while(i--);
-        }
-}
+
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-uint16_t pwmVal=0;  
-uint8_t dir=1;   
-
-
+uint16_t pwmVal=0;    
+static void Creator(void); /* 用于创建和初始化FreeRTOS中的所有任务、事件和信号量 */
+static TaskHandle_t V_handle_task_Creator = NULL;
+TaskHandle_t V_handle_task_DeviceStart = NULL;
+TaskHandle_t V_handle_task_IdleLED = NULL;
  
  
 // static uint32_t send_data1=1;
@@ -107,8 +98,6 @@ uint8_t dir=1;
 TaskHandle_t xHandleTsak[4];
 // 事件控制权柄
 EventGroupHandle_t myxEventGroupHandle_t = NULL;
-
-
 // void eventTask2(void)
 // {
 // 	// 设置变量接收事件
@@ -127,15 +116,12 @@ EventGroupHandle_t myxEventGroupHandle_t = NULL;
 //                                         flag =     0;
 //                                         printf("I am alive %d\n",flag);                                   
 //                                 }
-// //                                         BULE_LED(0);
+//                                         BULE_LED(0);
 // ENABLE_DC(0);                  
 // 		}            
 //                 portDISABLE_INTERRUPTS();		
 // 	}
 // }
-
-
-
 
 // void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 // {
@@ -189,8 +175,6 @@ void gesture_task(void* arg)
         // {
         //         // BULE_LED(1);
         //         printf("I will die \n");
-
-
         //                     xTaskDelayUntil(&myPreviousWakeTime, pdMS_TO_TICKS(5000));
         //         if(HAL_GPIO_ReadPin(GPIOC ,GPIO_PIN_6) == 0){
         //                 printf("I am die\n");
@@ -198,7 +182,6 @@ void gesture_task(void* arg)
         BULE_LED(0);
         ENABLE_DC(1);
         //         }
-
         // }
         // get_mpu6050_value();
         delay_ms(1000);
@@ -211,13 +194,11 @@ void sensor_task(void* arg)
         // enable_fifo(&dev_ctx);
     while(1)
     {
-
         BULE_LED(1);
         ENABLE_DC(0);
         // get_sensor_value(sht,adc_value);
         // lis2dh12_read_data(&dev_ctx);
         //HAL_GPIO_ReadPin(GPIOB ,GPIO_PIN_0) INT1
-        
         // read_fifo(&dev_ctx);
         // if(!HAL_GPIO_ReadPin(GPIOC ,GPIO_PIN_5)){//check INT2
         //         printf("I sleep\n");
@@ -233,23 +214,18 @@ void sensor_task(void* arg)
         //         printf("I no get \n");
         // }
         delay_ms(1000);
-
-
 	//   while (pwmVal< 500)
 	//   {
 	// 	  pwmVal++;
 	// 	  __HAL_TIM_SetCompare(&htim3, TIM_CHANNEL_4, pwmVal);    
 	// 	//   TIM3->CCR1 = pwmVal;  
-
         //           delay_ms(1);
 	//   }
-
 	//   while (pwmVal)
 	//   {
 	// 	  pwmVal--;
 	// 	  __HAL_TIM_SetCompare(&htim3, TIM_CHANNEL_4, pwmVal); 
 	// 	//   TIM3->CCR1 = pwmVal;    
-
         //           delay_ms(1);
 	//   }
     }
@@ -272,7 +248,7 @@ void dly_ms(uint32_t ms)
   */
 int main(void)
 {
-        dly_ms(100);
+        // dly_ms(100);
   /* USER CODE BEGIN 1 */
   /* USER CODE END 1 */
 
@@ -307,41 +283,26 @@ int main(void)
   /* USER CODE BEGIN 2 */
 //   HAL_TIM_PWM_Start(&htim3,TIM_CHANNEL_4);
 
-
-	
-
-
         // sensor_init(sht,adc_value,hadc1);
-
-
         // spi_flash_test();
-
-
         // i2c_eeprom_test(m24c02);
-
-
         // ui_test(u8g2);
-
         // lfs_test();
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-
+        xTaskCreate((TaskFunction_t)Creator,                 /* 任务入口函数 */
+                (const char *)"Creator",                 /* 任务名字 */
+                (uint16_t)512,                           /* 任务栈大小 */
+                (void *)NULL,                            /* 任务入口函数参数 */
+                (UBaseType_t)10,                         /* 任务的优先级 */
+                (TaskHandle_t *)&V_handle_task_Creator);/* 任务控制块指针 */
         // xTaskCreate(ui_task, "ui_task", 128, NULL, 5, NULL);
 
-
-
-
-        xTaskCreate(sensor_task, "sensor_task", 256, NULL, 3, NULL);
-
-        xTaskCreate(gesture_task, "gesture_task", 128, NULL, 1, NULL);
 	// xTaskCreate(
 	// 					(TaskFunction_t )eventTask2,(const char *)"task3",
 	// 					(uint16_t)128,(void*) NULL,1,&xHandleTsak[2]);
-								
-
-	
 	// // 创建事件
 	// myxEventGroupHandle_t = xEventGroupCreate();
 	// if(!myxEventGroupHandle_t)
@@ -410,7 +371,34 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
+static void Creator(void)
+{
 
+  taskENTER_CRITICAL(); // 进入临界区
+
+  /**
+   * @description: 任务创建区
+   */
+
+xTaskCreate((TaskFunction_t)sensor_task,             /* 任务入口函数 */
+                                      (const char *)"sensor_task",             /* 任务名字 */
+                                      (uint16_t)512,                               /* 任务栈大小 */
+                                      (void *)NULL,                                /* 任务入口函数参数 */
+                                      (UBaseType_t)10,                             /* 任务的优先级 */
+                                      (TaskHandle_t *)&V_handle_task_DeviceStart); /* 任务控制块指针 */
+                
+xTaskCreate((TaskFunction_t)gesture_task,             /* 任务入口函数 */
+                                      (const char *)"gesture_task",             /* 任务名字 */
+                                      (uint16_t)512,                           /* 任务栈大小 */
+                                      (void *)NULL,                            /* 任务入口函数参数 */
+                                      (UBaseType_t)1,                          /* 任务的优先级 */
+                                      (TaskHandle_t *)&V_handle_task_IdleLED); /* 任务控制块指针 */
+
+
+  /***********************************任务创建区***********************************/
+  vTaskDelete(V_handle_task_Creator); // 删除Creator任务
+  taskEXIT_CRITICAL();                // 退出临界区
+}
 /* USER CODE END 4 */
 
 /**
