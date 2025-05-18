@@ -21,7 +21,6 @@
 #include "adc.h"
 #include "dma.h"
 #include "i2c.h"
-#include "rtc.h"
 #include "spi.h"
 #include "tim.h"
 #include "usart.h"
@@ -184,7 +183,7 @@ void gesture_task(void* arg)
         //         }
         // }
         // get_mpu6050_value();
-        delay_ms(1000);
+        delay_ms(2000);
     }
 }
 
@@ -248,7 +247,7 @@ void dly_ms(uint32_t ms)
   */
 int main(void)
 {
-        // dly_ms(100);
+
   /* USER CODE BEGIN 1 */
   /* USER CODE END 1 */
 
@@ -271,7 +270,6 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_DMA_Init();
-  MX_RTC_Init();
   MX_ADC1_Init();
   MX_I2C1_Init();
   MX_I2C2_Init();
@@ -335,10 +333,9 @@ void SystemClock_Config(void)
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE|RCC_OSCILLATORTYPE_LSE;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
   RCC_OscInitStruct.HSEState = RCC_HSE_ON;
   RCC_OscInitStruct.HSEPredivValue = RCC_HSE_PREDIV_DIV1;
-  RCC_OscInitStruct.LSEState = RCC_LSE_ON;
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
@@ -361,8 +358,7 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
-  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_RTC|RCC_PERIPHCLK_ADC;
-  PeriphClkInit.RTCClockSelection = RCC_RTCCLKSOURCE_LSE;
+  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_ADC;
   PeriphClkInit.AdcClockSelection = RCC_ADCPCLK2_DIV6;
   if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
   {
