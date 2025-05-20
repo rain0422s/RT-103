@@ -45,8 +45,6 @@ static void os_delay_us(uint32_t nus)
         }  
         xTaskResumeAll();	//恢复OS调度		   
 } 
-//SystemCoreClock为系统时钟(system_stmf4xx.c中)，通常选择该时钟作为
-//systick定时器时钟，根据具体情况更改
 
 // #define delay_ms(ms) HAL_Delay(ms)
 #define delay_ms(ms) vTaskDelay(ms);
