@@ -19,7 +19,7 @@ enum {
 
 #define AT24C02                                 // <---
 #define AT24CXX_DEV (AT24CXX_ADDRESS_A000 << 1)  // <---
-#define AT24CXX_I2C hi2c2                        // <---
+#define AT24CXX_I2C hi2c1                        // <---
 
 // 二线制串行（I2C）EEPROM AT24CXX 系列的操作具有 1K、2K、4K、8K、16K、32K、64K、
 // 128K、256K、512K、1M、2M 等多种容量，不同容量其采用的设备地址位、寄存器地址位

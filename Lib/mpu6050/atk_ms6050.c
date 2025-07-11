@@ -37,7 +37,7 @@
 uint8_t atk_ms6050_write(uint8_t addr,uint8_t reg, uint8_t len, uint8_t *dat)
 {
 
-        int ret=HAL_I2C_Mem_Write(&hi2c2, addr , reg, I2C_MEMADD_SIZE_8BIT, dat, len, 0XFFFF);
+        int ret=HAL_I2C_Mem_Write(&hi2c1, addr , reg, I2C_MEMADD_SIZE_8BIT, dat, len, 0XFFFF);
 	if(ret==HAL_OK)return ATK_MS6050_EOK;
 	else return ATK_MS6050_EACK;  
 //     uint8_t i;
@@ -93,7 +93,7 @@ uint8_t atk_ms6050_write_byte(uint8_t addr, uint8_t reg, uint8_t dat)
  */
 uint8_t atk_ms6050_read(uint8_t addr, uint8_t reg, uint8_t len, uint8_t *dat)
 {
-        int ret= HAL_I2C_Mem_Read(&hi2c2, addr , reg, I2C_MEMADD_SIZE_8BIT, dat,  len, 0XFFFF);
+        int ret= HAL_I2C_Mem_Read(&hi2c1, addr , reg, I2C_MEMADD_SIZE_8BIT, dat,  len, 0XFFFF);
 	if(ret==HAL_OK)return ATK_MS6050_EOK;
 	else return ATK_MS6050_EACK;  
 

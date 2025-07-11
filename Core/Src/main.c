@@ -25,7 +25,7 @@
 #include "tim.h"
 #include "usart.h"
 #include "gpio.h"
-
+#include "key.h"
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "i2cdev.h"
@@ -58,21 +58,20 @@ uint8_t whoamI = 0;
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
-#define YELLOW_LED(x) do{ x? \
-	                     HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_RESET): \
-	                     HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_SET); \
-                 } while(0)
-
-#define ENABLE_DC(x) do{ x? \
-	                     HAL_GPIO_WritePin(GPIOC, GPIO_PIN_10, GPIO_PIN_RESET): \
-	                     HAL_GPIO_WritePin(GPIOC, GPIO_PIN_10, GPIO_PIN_SET); \
-                 } while(0)
-
-#define BULE_LED(x) do{ x? \
+#define RED_LED(x) do{ x? \
 	                     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15, GPIO_PIN_RESET): \
 	                     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15, GPIO_PIN_SET); \
                  } while(0)
 
+
+#define BLUE_LED(x) do{ x? \
+	                     HAL_GPIO_WritePin(GPIOC, GPIO_PIN_10, GPIO_PIN_RESET): \
+	                     HAL_GPIO_WritePin(GPIOC, GPIO_PIN_10, GPIO_PIN_SET); \
+                 } while(0)
+
+
+#define PowerOn         HAL_GPIO_WritePin(GPIOB, GPIO_PIN_10, GPIO_PIN_SET);
+#define PowerDown       HAL_GPIO_WritePin(GPIOB, GPIO_PIN_10, GPIO_PIN_RESET);
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
@@ -90,59 +89,89 @@ TaskHandle_t V_handle_task_IdleLED = NULL;
 
 // 声明事件
 #define EVENT7 (0x01 << 6)
-
+TimerHandle_t xLedTimer;
 
         int flag =0;
+        int time_flag=0;
 //任务控制权柄
 TaskHandle_t xHandleTsak[4];
 // 事件控制权柄
 EventGroupHandle_t myxEventGroupHandle_t = NULL;
-// void eventTask2(void)
-// {
-// 	// 设置变量接收事件
-// 	EventBits_t r_event;
-// 	while(1)
-// 	{
-// 		r_event = xEventGroupWaitBits(myxEventGroupHandle_t,EVENT7,
-// 									  pdTRUE,pdFALSE,portMAX_DELAY);
-// 		if((r_event&EVENT7) != 0)
-// 		{
-//                         // for(i=0;i<50;i++){                    
-//                                 if(HAL_GPIO_ReadPin(GPIOC ,GPIO_PIN_6) == 0){                               
-//                                         flag =     1;
-//                                         printf("I do it1 %d\n",flag); 
-//                                 }else{
-//                                         flag =     0;
-//                                         printf("I am alive %d\n",flag);                                   
-//                                 }
-//                                         BULE_LED(0);
-// ENABLE_DC(0);                  
-// 		}            
-//                 portDISABLE_INTERRUPTS();		
-// 	}
-// }
+void eventTask2(void)
+{
+        // static portTickType myPreviousWakeTime;
+        // myPreviousWakeTime = xTaskGetTickCount();
+        // 设置变量接收事件
+        EventBits_t r_event;
+	for (;;)
+        {
+                printf("I do it eventTask2 %d\n",flag); 
+                time_flag=0;
+		r_event = xEventGroupWaitBits(myxEventGroupHandle_t,EVENT7,
+						pdTRUE,pdFALSE,portMAX_DELAY);
+		if((r_event&EVENT7) != 0){
 
-// void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
-// {
-// 	BaseType_t pxHigherPriorityTaskWoken; 
-// 	uint32_t ulReturn;
-// 	uint16_t event;
-// 	ulReturn = taskENTER_CRITICAL_FROM_ISR();
-// 	GPIO_PinState pinState = HAL_GPIO_ReadPin( GPIOC,GPIO_Pin );
-// 	if(pinState == GPIO_PIN_RESET )
-// 	{
-// 		// 判断中断位置
-// 		if(GPIO_Pin == GPIO_PIN_6 )
-// 		{
-// 			event = EVENT7;
-// 		}
-// 		xEventGroupSetBitsFromISR(myxEventGroupHandle_t,event,
-// 		&pxHigherPriorityTaskWoken);
-// 		portYIELD_FROM_ISR(pxHigherPriorityTaskWoken);
-// 	}
-// 	taskEXIT_CRITICAL_FROM_ISR( ulReturn ); 	
-// }
+                        if (xTimerReset(xLedTimer, 0) != pdPASS) {
+                                printf("rain Timer reset failed\n");
+                        } else {
+                                printf("rain Timer reset (restarted) successfully\n");
+                        }
+                   
+                        while(!HAL_GPIO_ReadPin(GPIOB ,GPIO_PIN_11)){
+                                printf("I will die \n");
+                                // xTaskDelayUntil(&myPreviousWakeTime, pdMS_TO_TICKS(5000));
+                                
+                                if(time_flag){
+                                        printf("rain I am die1\n");
+                                        PowerDown;
+                                        break;
+                                }
+                        }
+                        if(time_flag)
+                                printf("rain I am die2\n");    
+                        else
+                                printf("I am alive\n");
+                        // 主动关闭定时器
+                        if (xTimerStop(xLedTimer, 0) != pdPASS) {
+                                printf("rain Timer stop failed\n");
+                        } else {
+                                printf("rain Timer stopped successfully\n");
+                        }
+                }
+        }
+}
 
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+	BaseType_t pxHigherPriorityTaskWoken; 
+	uint32_t ulReturn;
+	uint16_t event;
+	ulReturn = taskENTER_CRITICAL_FROM_ISR();
+	GPIO_PinState pinState = HAL_GPIO_ReadPin( GPIOB,GPIO_Pin );
+	if(pinState == GPIO_PIN_RESET ){
+		// 判断中断位置 
+		if(GPIO_Pin == GPIO_PIN_11 ){
+			event = EVENT7;
+		}
+		xEventGroupSetBitsFromISR(myxEventGroupHandle_t,event,
+                        &pxHigherPriorityTaskWoken);
+                // 如果有更高优先级的任务被唤醒，则进行任务切换
+		portYIELD_FROM_ISR(pxHigherPriorityTaskWoken);
+	}
+	taskEXIT_CRITICAL_FROM_ISR( ulReturn ); 	
+}
+
+void vTimerCallback(TimerHandle_t xTimer) {
+    // 定时器触发时执行的操作
+        flag = !flag;
+
+        BLUE_LED(!flag);
+        RED_LED(flag);
+
+        time_flag=1;
+
+        printf("Timer Callback: flag=%d\n", flag);
+}
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -166,68 +195,69 @@ void ui_task(void* arg)
 
 void gesture_task(void* arg)
 {
-        //         static portTickType myPreviousWakeTime;
-        //   myPreviousWakeTime = xTaskGetTickCount();
+//        BLUE_LED(0);
+
+
     while(1)
     {
-        // if(flag&&HAL_GPIO_ReadPin(GPIOC ,GPIO_PIN_6) == 0)
-        // {
-        //         // BULE_LED(1);
-        //         printf("I will die \n");
-        //                     xTaskDelayUntil(&myPreviousWakeTime, pdMS_TO_TICKS(5000));
-        //         if(HAL_GPIO_ReadPin(GPIOC ,GPIO_PIN_6) == 0){
-        //                 printf("I am die\n");
-        //                 flag =0;
-        BULE_LED(0);
-        ENABLE_DC(1);
-        //         }
-        // }
+        if(HAL_GPIO_ReadPin(GPIOB ,GPIO_PIN_11) == 0)
+        {
+                printf("I do it3333333333 %d\n",flag); 
+                // BLUE_LED(1);
+
+        }
+        printf("I am alive\n");
         // get_mpu6050_value();
         delay_ms(2000);
     }
 }
+#define lis2dh12_INT1_GPIO_Port   GPIOA
+#define lis2dh12_INT1_Pin         GPIO_PIN_11
+#define lis2dh12_INT2_GPIO_Port   GPIOA
+#define lis2dh12_INT2_Pin         GPIO_PIN_12
 
 void sensor_task(void* arg)
 { 
-        // lis2dh12_init(&dev_ctx);
         // enable_fifo(&dev_ctx);
-    while(1)
-    {
-        BULE_LED(1);
-        ENABLE_DC(0);
-        // get_sensor_value(sht,adc_value);
-        // lis2dh12_read_data(&dev_ctx);
-        //HAL_GPIO_ReadPin(GPIOB ,GPIO_PIN_0) INT1
-        // read_fifo(&dev_ctx);
-        // if(!HAL_GPIO_ReadPin(GPIOC ,GPIO_PIN_5)){//check INT2
-        //         printf("I sleep\n");
-        //         BULE_LED(0);
-        // }else{
-        //         printf("I am ailve\n");
-        //         BULE_LED(1);
-        // }
-        // if(!HAL_GPIO_ReadPin(GPIOB ,GPIO_PIN_0)){//check INT1
-        //         printf("I get it\n");
-        //         clear_init1(&dev_ctx);
-        // }else{
-        //         printf("I no get \n");
-        // }
-        delay_ms(1000);
-	//   while (pwmVal< 500)
-	//   {
-	// 	  pwmVal++;
-	// 	  __HAL_TIM_SetCompare(&htim3, TIM_CHANNEL_4, pwmVal);    
-	// 	//   TIM3->CCR1 = pwmVal;  
-        //           delay_ms(1);
-	//   }
-	//   while (pwmVal)
-	//   {
-	// 	  pwmVal--;
-	// 	  __HAL_TIM_SetCompare(&htim3, TIM_CHANNEL_4, pwmVal); 
-	// 	//   TIM3->CCR1 = pwmVal;    
-        //           delay_ms(1);
-	//   }
-    }
+        while(1)
+        {
+                // BLUE_LED(1);
+                // ENABLE_DC(0);
+                // get_sensor_value(sht,adc_value);
+                lis2dh12_read_data(&dev_ctx);
+                // HAL_GPIO_ReadPin(GPIOB ,GPIO_PIN_0) ;//INT1
+                // read_fifo(&dev_ctx);
+                //check INT2
+                // if(!HAL_GPIO_ReadPin(lis2dh12_INT2_GPIO_Port ,lis2dh12_INT2_Pin)){
+                //         printf("I sleep\n");
+                //         // BLUE_LED(0);
+                // }else{
+                //         printf("I am ailve\n");
+                //         // BLUE_LED(1);
+                // }
+                //check INT1
+                // if(!HAL_GPIO_ReadPin(lis2dh12_INT2_GPIO_Port ,lis2dh12_INT1_Pin)){
+                //         printf("I get it\n");
+                //         clear_init1(&dev_ctx);
+                // }else{
+                //         printf("I no get \n");
+                // }
+                delay_ms(1000);
+                //   while (pwmVal< 500)
+                //   {
+                // 	  pwmVal++;
+                // 	  __HAL_TIM_SetCompare(&htim3, TIM_CHANNEL_4, pwmVal);    
+                // 	//   TIM3->CCR1 = pwmVal;  
+                //           delay_ms(1);
+                //   }
+                //   while (pwmVal)
+                //   {
+                // 	  pwmVal--;
+                // 	  __HAL_TIM_SetCompare(&htim3, TIM_CHANNEL_4, pwmVal); 
+                // 	//   TIM3->CCR1 = pwmVal;    
+                //           delay_ms(1);
+                //   }
+        }
 }
 void dly_ms(uint32_t ms)
 {
@@ -272,7 +302,6 @@ int main(void)
   MX_DMA_Init();
   MX_ADC1_Init();
   MX_I2C1_Init();
-  MX_I2C2_Init();
   MX_SPI1_Init();
   MX_SPI2_Init();
   MX_USART1_UART_Init();
@@ -286,6 +315,11 @@ int main(void)
         // i2c_eeprom_test(m24c02);
         // ui_test(u8g2);
         // lfs_test();
+        BLUE_LED(1);
+        RED_LED(0);
+        lis2dh12_init(&dev_ctx);
+        PowerOn;     
+        printf("I have powered on.\n"); 
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -298,15 +332,7 @@ int main(void)
                 (TaskHandle_t *)&V_handle_task_Creator);/* 任务控制块指针 */
         // xTaskCreate(ui_task, "ui_task", 128, NULL, 5, NULL);
 
-	// xTaskCreate(
-	// 					(TaskFunction_t )eventTask2,(const char *)"task3",
-	// 					(uint16_t)128,(void*) NULL,1,&xHandleTsak[2]);
-	// // 创建事件
-	// myxEventGroupHandle_t = xEventGroupCreate();
-	// if(!myxEventGroupHandle_t)
-	// 	printf("event fail\n");
-	// else
-	// 	printf("event suc\n");
+
 
         // 启动任务调度
        vTaskStartScheduler();
@@ -367,29 +393,47 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
-static void Creator(void)
-{
+static void Creator(void){
 
-  taskENTER_CRITICAL(); // 进入临界区
+        taskENTER_CRITICAL(); // 进入临界区
 
-  /**
-   * @description: 任务创建区
-   */
+        /**
+         * @description: 任务创建区
+         */
 
-xTaskCreate((TaskFunction_t)sensor_task,             /* 任务入口函数 */
-                                      (const char *)"sensor_task",             /* 任务名字 */
-                                      (uint16_t)512,                               /* 任务栈大小 */
-                                      (void *)NULL,                                /* 任务入口函数参数 */
-                                      (UBaseType_t)10,                             /* 任务的优先级 */
-                                      (TaskHandle_t *)&V_handle_task_DeviceStart); /* 任务控制块指针 */
+        xTaskCreate((TaskFunction_t)sensor_task,             /* 任务入口函数 */
+                                        (const char *)"sensor_task",             /* 任务名字 */
+                                        (uint16_t)256,                               /* 任务栈大小 */
+                                        (void *)NULL,                                /* 任务入口函数参数 */
+                                        (UBaseType_t)10,                             /* 任务的优先级 */
+                                        (TaskHandle_t *)&V_handle_task_DeviceStart); /* 任务控制块指针 */
                 
-xTaskCreate((TaskFunction_t)gesture_task,             /* 任务入口函数 */
-                                      (const char *)"gesture_task",             /* 任务名字 */
-                                      (uint16_t)512,                           /* 任务栈大小 */
-                                      (void *)NULL,                            /* 任务入口函数参数 */
-                                      (UBaseType_t)1,                          /* 任务的优先级 */
-                                      (TaskHandle_t *)&V_handle_task_IdleLED); /* 任务控制块指针 */
+        xTaskCreate((TaskFunction_t)gesture_task,           
+                                        (const char *)"gesture_task",          
+                                        (uint16_t)256,                        
+                                        (void *)NULL,                   
+                                        (UBaseType_t)1,                        
+                                        (TaskHandle_t *)&V_handle_task_IdleLED);
+	xTaskCreate((TaskFunction_t )eventTask2,
+                                        (const char *)"eventTask2",
+                                        (uint16_t)128,
+                                        (void*) NULL,
+                                        2,
+                                        &xHandleTsak[2]);
+	// 创建事件
+	myxEventGroupHandle_t = xEventGroupCreate();
+	if(!myxEventGroupHandle_t)
+		printf("event fail\n");
+	else
+		printf("event suc\n");
 
+        xLedTimer = xTimerCreate(
+                        "MyTimer",          // 定时器名称
+                        pdMS_TO_TICKS(3000), // 定时器周期（1000毫秒）
+                        pdFALSE,          
+                        (void *)0,          // 定时器ID
+                        vTimerCallback      // 回调函数
+                );
 
   /***********************************任务创建区***********************************/
   vTaskDelete(V_handle_task_Creator); // 删除Creator任务

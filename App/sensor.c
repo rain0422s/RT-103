@@ -1,23 +1,23 @@
 #include "sensor.h"
 
 
- /**
-   * @brief   读取MPU6050的ID
-   * @param
-   * @retval 
-   */
-uint8_t MPU6050ReadID(void){
-        unsigned char Re = 0;
-        HAL_I2C_Mem_Read(&hi2c2, 0xd0, 0X75, 1, &Re, 1, 0xffff);
-        if (Re != 0x68) {
-                println("MPU6050 was not found\r\n");
-                return 0;
-        } else {
-                println("MPU6050 ID = %x\r\n",Re);
-                return 1;
-        }
+//  /**
+//    * @brief   读取MPU6050的ID
+//    * @param
+//    * @retval 
+//    */
+// uint8_t MPU6050ReadID(void){
+//         unsigned char Re = 0;
+//         HAL_I2C_Mem_Read(&hi2c2, 0xd0, 0X75, 1, &Re, 1, 0xffff);
+//         if (Re != 0x68) {
+//                 println("MPU6050 was not found\r\n");
+//                 return 0;
+//         } else {
+//                 println("MPU6050 ID = %x\r\n",Re);
+//                 return 1;
+//         }
 
-}
+// }
 
 uint8_t sensor_init(SHT3xObjectType sht,uint16_t* ADC_Value,ADC_HandleTypeDef adc){
         sht3x_init(&sht ,0x44,hi2c1);

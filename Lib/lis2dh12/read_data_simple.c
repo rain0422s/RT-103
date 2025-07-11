@@ -39,8 +39,8 @@
 
 /* Private macro -------------------------------------------------------------*/
 #ifdef MKI109V2
-#define CS_SPI2_GPIO_Port   GPIOB
-#define CS_SPI2_Pin         GPIO_PIN_12
+#define CS_SPI2_GPIO_Port   GPIOC
+#define CS_SPI2_Pin         GPIO_PIN_7
 #define CS_SPI1_GPIO_Port   GPIOA
 #define CS_SPI1_Pin         GPIO_PIN_4
 #endif
@@ -291,7 +291,7 @@ void enable_fifo(stmdev_ctx_t *dev_ctx){
 void read_fifo(stmdev_ctx_t *dev_ctx){
         u_int8_t val;
         lis2dh12_fifo_data_level_get(dev_ctx,&val);
-        printf("fifo data level:%d",val);
+        printf("fifo data level:%d\n",val);
         if(val == 30){
                 for(int i = 0 ; i < 30 ; i++){
                         /* Read magnetic field data */
@@ -311,7 +311,7 @@ void read_fifo(stmdev_ctx_t *dev_ctx){
         }
 
         
-        printf("read after fifo data level:%d",val); 
+        printf("read after fifo data level:%d\n",val); 
 }     
 //使能惯性中断唤醒
 void enable_inertial_wakeup(stmdev_ctx_t *dev_ctx){
@@ -399,13 +399,78 @@ void clear_init1(stmdev_ctx_t *dev_ctx){
 
 }
 
+
+void enable_activity_recognition(stmdev_ctx_t *dev_ctx){
+                uint8_t val;
+        enable_inertial_wakeup(dev_ctx);
+
+        //开启活动/不活动识别功能
+        lis2dh12_act_threshold_set(dev_ctx,set_mg(dev_ctx,200));//加速度阈值:16 * 13 = 208 mg = 0.208 g
+        
+        lis2dh12_act_timeout_set(dev_ctx,set_time(dev_ctx,2));//2.01s
+        
+        val = 0b00001010;
+        lis2dh12_pin_int2_config_set(dev_ctx,&val);
+
+        /*
+        * Set device in continuos mode
+        */   
+        lis2dh12_operating_mode_set(dev_ctx, dev_ctx->mode);
+}
+
+void enable_high_resolution_mode(stmdev_ctx_t *dev_ctx){
+        uint8_t ctrl_reg;
+// 1. 将 08h 写入 CTRL_REG4 // HR 置位
+// LPen 清零
+  lis2dh12_ctrl_reg4_t ctrl_reg4;
+  ctrl_reg4.hr   = 1;
+  lis2dh12_write_reg(dev_ctx, LIS2DH12_CTRL_REG4,
+                             (uint8_t *)&ctrl_reg4, 1);
+// 2. 将 57h 写入 CTRL_REG1
+// 使能所有轴
+// ODR = 100 Hz
+        ctrl_reg = 0x57;
+        lis2dh12_write_reg(dev_ctx, LIS2DH12_CTRL_REG1,
+                                (uint8_t *)&ctrl_reg, 1);      
+        lis2dh12_read_reg(dev_ctx, LIS2DH12_CTRL_REG1,
+                                (uint8_t *)&ctrl_reg, 1);  
+        printf("CTRL_REG1:0x%x\n",ctrl_reg);
+// 3. 等待导通时间结束
+// LPen 清零
+
+// 4. 将 07h 写入 CTRL_REG1
+// 使能所有轴
+// 掉电
+        ctrl_reg = 0x07;
+        lis2dh12_write_reg(dev_ctx, LIS2DH12_CTRL_REG1,
+                                (uint8_t *)&ctrl_reg, 1);      
+        lis2dh12_read_reg(dev_ctx, LIS2DH12_CTRL_REG1,
+                                (uint8_t *)&ctrl_reg, 1);  
+        printf("CTRL_REG1:0x%x\n",ctrl_reg);
+// 5. 读取 REFERENCE // 复位滤波器模块
+lis2dh12_filter_reference_get(dev_ctx,&ctrl_reg);
+// 6. 将 57h 写入 CTRL_REG1
+// LPen 清零
+// 使能所有轴
+// ODR = 100 Hz
+        ctrl_reg = 0x57;
+        lis2dh12_write_reg(dev_ctx, LIS2DH12_CTRL_REG1,
+                                (uint8_t *)&ctrl_reg, 1);      
+        lis2dh12_read_reg(dev_ctx, LIS2DH12_CTRL_REG1,
+                                (uint8_t *)&ctrl_reg, 1);  
+        printf("CTRL_REG1:0x%x\n",ctrl_reg);
+// 7. 等待导通时间结束
+}
+
+
+
 /* Main Example --------------------------------------------------------------*/
 void lis2dh12_init(stmdev_ctx_t *dev_ctx){
         /*
         *  Initialize mems driver interface
         */
         // stmdev_ctx_t dev_ctx;
-        uint8_t val;
+
         dev_ctx->write_reg = platform_write;
         dev_ctx->read_reg  = platform_read;
         dev_ctx->handle    = &hspi2;
@@ -420,32 +485,24 @@ void lis2dh12_init(stmdev_ctx_t *dev_ctx){
         if ( whoamI != LIS2DH12_ID )
                 while(1); /*manage here device not found */
 
-        enable_inertial_wakeup(dev_ctx);
 
-        //开启活动/不活动识别功能
-        lis2dh12_act_threshold_set(dev_ctx,set_mg(dev_ctx,200));//加速度阈值:16 * 13 = 208 mg = 0.208 g
-        
-        lis2dh12_act_timeout_set(dev_ctx,set_time(dev_ctx,2));//2.01s
-        
-        val = 0b00001010;
-        lis2dh12_pin_int2_config_set(dev_ctx,&val);
         
         /*
         *  Enable Block Data Update
         */
-        //lis2dh12_block_data_update_set(dev_ctx, PROPERTY_ENABLE);
+        lis2dh12_block_data_update_set(dev_ctx, PROPERTY_ENABLE);
         /*
         * Set Output Data Rate
         */
-        //lis2dh12_data_rate_set(dev_ctx, dev_ctx->odr);
+        lis2dh12_data_rate_set(dev_ctx, dev_ctx->odr);
         /*
         * Set full scale
         */      
-        //lis2dh12_full_scale_set(dev_ctx,dev_ctx->fs);
+        lis2dh12_full_scale_set(dev_ctx,dev_ctx->fs);
         /*
         * Enable temperature sensor
         */   
-        //lis2dh12_temperature_meas_set(dev_ctx, LIS2DH12_TEMP_ENABLE);
+        lis2dh12_temperature_meas_set(dev_ctx, LIS2DH12_TEMP_ENABLE);
         /*
         * Set device in continuos mode
         */   
@@ -489,7 +546,7 @@ void lis2dh12_read_data(stmdev_ctx_t *dev_ctx){
                         temperature_degC = LIS2DH12_FROM_LSB_TO_degC_HR( data_raw_temperature.i16bit );
         
                         sprintf((char*)tx_buffer, "Temperature [degC]:%6.2f\r\n", temperature_degC );
-                        //tx_com( tx_buffer, strlen( (char const*)tx_buffer ) );
+                        // tx_com( tx_buffer, strlen( (char const*)tx_buffer ) );
                 }
         
                 // float roll  = atan2(sample.y, sample.z) * (180.0 / M_PI);
@@ -509,6 +566,6 @@ void lis2dh12_read_data(stmdev_ctx_t *dev_ctx){
                         sample.new_angle_x = 180-sample.new_angle_x;
                         sample.new_angle_y = 180-sample.new_angle_y;
                 }
-                printf("sample->new_angle_x:%d, sample->new_angle_y:%d, sample->new_angle_z:%d \r\n",sample.new_angle_x, sample.new_angle_y, sample.new_angle_z);
+                //printf("sample->new_angle_x:%d, sample->new_angle_y:%d, sample->new_angle_z:%d \r\n",sample.new_angle_x, sample.new_angle_y, sample.new_angle_z);
 
 }
