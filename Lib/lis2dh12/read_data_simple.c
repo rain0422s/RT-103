@@ -566,6 +566,6 @@ void lis2dh12_read_data(stmdev_ctx_t *dev_ctx){
                         sample.new_angle_x = 180-sample.new_angle_x;
                         sample.new_angle_y = 180-sample.new_angle_y;
                 }
-                //printf("sample->new_angle_x:%d, sample->new_angle_y:%d, sample->new_angle_z:%d \r\n",sample.new_angle_x, sample.new_angle_y, sample.new_angle_z);
+                printf("sample->new_angle_x:%d, sample->new_angle_y:%d, sample->new_angle_z:%d \r\n",sample.new_angle_x, sample.new_angle_y, sample.new_angle_z);
 
 }

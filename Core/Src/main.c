@@ -25,7 +25,7 @@
 #include "tim.h"
 #include "usart.h"
 #include "gpio.h"
-#include "key.h"
+
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "i2cdev.h"
@@ -39,6 +39,7 @@
 #include "FreeRTOS.h"
 #include "event_groups.h"
 #include "read_data_simple.h"
+#include "key.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -97,45 +98,43 @@ TimerHandle_t xLedTimer;
 TaskHandle_t xHandleTsak[4];
 // 事件控制权柄
 EventGroupHandle_t myxEventGroupHandle_t = NULL;
-void eventTask2(void)
-{
+void eventTask2(void){
         // static portTickType myPreviousWakeTime;
-        // myPreviousWakeTime = xTaskGetTickCount();
+        
         // 设置变量接收事件
         EventBits_t r_event;
-	for (;;)
-        {
-                printf("I do it eventTask2 %d\n",flag); 
+	for (;;){
+                // myPreviousWakeTime = xTaskGetTickCount();
+                printf("I do it eventTask2\n"); 
                 time_flag=0;
 		r_event = xEventGroupWaitBits(myxEventGroupHandle_t,EVENT7,
 						pdTRUE,pdFALSE,portMAX_DELAY);
 		if((r_event&EVENT7) != 0){
-
                         if (xTimerReset(xLedTimer, 0) != pdPASS) {
                                 printf("rain Timer reset failed\n");
-                        } else {
-                                printf("rain Timer reset (restarted) successfully\n");
                         }
-                   
                         while(!HAL_GPIO_ReadPin(GPIOB ,GPIO_PIN_11)){
                                 printf("I will die \n");
-                                // xTaskDelayUntil(&myPreviousWakeTime, pdMS_TO_TICKS(5000));
-                                
                                 if(time_flag){
                                         printf("rain I am die1\n");
-                                        PowerDown;
                                         break;
                                 }
                         }
-                        if(time_flag)
-                                printf("rain I am die2\n");    
-                        else
-                                printf("I am alive\n");
                         // 主动关闭定时器
                         if (xTimerStop(xLedTimer, 0) != pdPASS) {
                                 printf("rain Timer stop failed\n");
-                        } else {
-                                printf("rain Timer stopped successfully\n");
+                                return;
+                        }
+                        if(time_flag){
+                                if(button_press_pattern_scan()==LONG_PRESS_STATE){
+                                        printf("rain I am die2\n");   
+                                        PowerDown;
+                                }else{
+                                        printf("I am alive333\n");
+                                        time_flag=0;
+                                }
+                        }else{
+                                printf("I am alive\n");
                         }
                 }
         }
@@ -162,7 +161,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 }
 
 void vTimerCallback(TimerHandle_t xTimer) {
-    // 定时器触发时执行的操作
+        // 定时器触发时执行的操作
         flag = !flag;
 
         BLUE_LED(!flag);
@@ -193,23 +192,28 @@ void ui_task(void* arg)
     }
 }
 
-void gesture_task(void* arg)
-{
-//        BLUE_LED(0);
+void gesture_task(void* arg){
 
+        ButtonState buttonState = IDLE_STATE;
+        while(1){
+                buttonState = button_press_pattern_scan();
 
-    while(1)
-    {
-        if(HAL_GPIO_ReadPin(GPIOB ,GPIO_PIN_11) == 0)
-        {
-                printf("I do it3333333333 %d\n",flag); 
-                // BLUE_LED(1);
-
+                switch (buttonState){
+                        case SHORT_PRESS_STATE:
+                                BLUE_LED(1);
+                                RED_LED(0);
+                                break;
+                        case LONG_PRESS_STATE:
+                                BLUE_LED(0);
+                                RED_LED(0);
+                                break;
+                        case DOUBLE_PRESS_STATE:
+                                BLUE_LED(0);
+                                RED_LED(1);
+                                break;
+                }
+                // delay_ms(10);
         }
-        printf("I am alive\n");
-        // get_mpu6050_value();
-        delay_ms(2000);
-    }
 }
 #define lis2dh12_INT1_GPIO_Port   GPIOA
 #define lis2dh12_INT1_Pin         GPIO_PIN_11
@@ -219,8 +223,10 @@ void gesture_task(void* arg)
 void sensor_task(void* arg)
 { 
         // enable_fifo(&dev_ctx);
+
         while(1)
         {
+                        spi_flash_test();
                 // BLUE_LED(1);
                 // ENABLE_DC(0);
                 // get_sensor_value(sht,adc_value);
@@ -309,17 +315,20 @@ int main(void)
   MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
 //   HAL_TIM_PWM_Start(&htim3,TIM_CHANNEL_4);
-
+        PowerOn;
+        printf("I have powered on.\n"); 
+        BLUE_LED(1);
+        RED_LED(0);
+        
+        lis2dh12_init(&dev_ctx);
         // sensor_init(sht,adc_value,hadc1);
-        // spi_flash_test();
+
         // i2c_eeprom_test(m24c02);
         // ui_test(u8g2);
         // lfs_test();
-        BLUE_LED(1);
-        RED_LED(0);
-        lis2dh12_init(&dev_ctx);
-        PowerOn;     
-        printf("I have powered on.\n"); 
+
+             
+        
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -429,7 +438,7 @@ static void Creator(void){
 
         xLedTimer = xTimerCreate(
                         "MyTimer",          // 定时器名称
-                        pdMS_TO_TICKS(3000), // 定时器周期（1000毫秒）
+                        pdMS_TO_TICKS(2000), // 定时器周期（1000毫秒）
                         pdFALSE,          
                         (void *)0,          // 定时器ID
                         vTimerCallback      // 回调函数

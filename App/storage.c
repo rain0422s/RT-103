@@ -24,42 +24,45 @@ void spi_flash_test()
         /* 2- Erase */
         if (w25qxx_erase_block(0) == W25Qx_OK)
                 printf(" SPI Erase Block ok\n");
-        else
-                Error_Handler();
-
-        /*-2- Written to the flash */
-        /* fill buffer */
-        for (i = 0; i < 0x100; i++) {
-                wData[i] = i;
-                rData[i] = 0;
-        }
-
-        if (w25qxx_write(wData, 0x00, 0x100) == W25Qx_OK)
-                printf(" SPI Write ok\n");
-        else
-                Error_Handler();
-
-        /* 3- Read the flash */
-        if (w25qxx_read(rData, 0x00, 0x100) == W25Qx_OK)
-                printf(" SPI Read ok\n");
-        else
-                Error_Handler();
-
-        printf("SPI Read Data : \n");
-
-        for (i = 0; i < 0x100; i++)
-                printf("0x%02X  ", rData[i]);
-        printf("\n");
-
-        /* 4- check date */
-        if (memcmp(wData, rData, 0x100) == 0){
-                printf(" W25Q64FV SPI Test OK\n");
-        }
         else{
-                printf(" W25Q64FV SPI Test False\n");
+                printf(" SPI Erase Block error\n");
+                return;
         }
 
-        return ;
+
+        // /*-2- Written to the flash */
+        // /* fill buffer */
+        // for (i = 0; i < 0x100; i++) {
+        //         wData[i] = i;
+        //         rData[i] = 0;
+        // }
+
+        // if (w25qxx_write(wData, 0x00, 0x100) == W25Qx_OK)
+        //         printf(" SPI Write ok\n");
+        // // else
+        // //         Error_Handler();
+
+        // /* 3- Read the flash */
+        // if (w25qxx_read(rData, 0x00, 0x100) == W25Qx_OK)
+        //         printf(" SPI Read ok\n");
+        // // else
+        // //         Error_Handler();
+
+        // printf("SPI Read Data : \n");
+
+        // for (i = 0; i < 0x100; i++)
+        //         printf("0x%02X  ", rData[i]);
+        // printf("\n");
+
+        // /* 4- check date */
+        // if (memcmp(wData, rData, 0x100) == 0){
+        //         printf(" W25Q64FV SPI Test OK\n");
+        // }
+        // else{
+        //         printf(" W25Q64FV SPI Test False\n");
+        // }
+
+        // return ;
 } 
 
 
