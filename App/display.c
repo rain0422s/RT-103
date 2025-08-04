@@ -1,4 +1,5 @@
 #include "display.h"
+#ifdef U8G2_ENABLED
 #define CHECK_KEY(n)  n?  HAL_GPIO_ReadPin(GPIOB ,GPIO_PIN_5) : HAL_GPIO_ReadPin(GPIOB ,GPIO_PIN_1);
 /*循环输出字符，同时输出两端字符，x轴不断改变实现移动UI
 * 第一段移动范围 0-----128-----256
@@ -217,3 +218,4 @@ void ui_test(u8g2_t u8g2){
 }
 
 
+#endif

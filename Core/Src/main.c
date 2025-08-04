@@ -47,9 +47,7 @@
 uint16_t adc_value[100];
 SHT3xObjectType sht;
 struct i2c_cli m24c02;
-u8g2_t u8g2;
 stmdev_ctx_t dev_ctx;
-uint8_t whoamI = 0;
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -111,12 +109,13 @@ void eventTask2(void){
 
                         if (xTimerReset(xLedTimer, 0) != pdPASS) {
                                 printf("Timer reset failed\n");
+                                return;
                         }
 
-                        while(!HAL_GPIO_ReadPin(GPIOB ,GPIO_PIN_11)){
-                                if(time_flag)
-                                        break;
+                        while(!HAL_GPIO_ReadPin(GPIOB ,GPIO_PIN_11) && !time_flag){
+                                delay_ms(1);
                         }
+                        
 
                         // 主动关闭定时器
                         if (xTimerStop(xLedTimer, 0) != pdPASS) {
@@ -170,7 +169,8 @@ void SystemClock_Config(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-
+#ifdef U8G2_ENABLED
+u8g2_t u8g2;
 void ui_task(void* arg)
 {
     while(1)
@@ -179,7 +179,7 @@ void ui_task(void* arg)
         delay_ms(500);
     }
 }
-
+#endif
 void gesture_task(void* arg){
 
         ButtonState buttonState = IDLE_STATE;
@@ -395,7 +395,7 @@ static void Creator(void){
 
         xTaskCreate((TaskFunction_t)sensor_task,             /* 任务入口函数 */
                                         (const char *)"sensor_task",             /* 任务名字 */
-                                        (uint16_t)256,                               /* 任务栈大小 */
+                                        (uint16_t)512,                               /* 任务栈大小 */
                                         (void *)NULL,                                /* 任务入口函数参数 */
                                         (UBaseType_t)3,                             /* 任务的优先级 */
                                         (TaskHandle_t *)&V_handle_task_DeviceStart); /* 任务控制块指针 */

@@ -1,6 +1,6 @@
 #ifndef __UTILS_H__
 #define __UTILS_H__
-
+// #define U8G2_ENABLED
 ///////////////////////////////////////////////// delay
 
 #include "stm32f1xx_hal.h"
@@ -47,7 +47,7 @@ static void os_delay_us(uint32_t nus)
 } 
 
 // #define delay_ms(ms) HAL_Delay(ms)
-#define delay_ms(ms) vTaskDelay(ms);
+#define delay_ms(ms) vTaskDelay(ms)
 #define delay_us(us) os_delay_us(us)
 
 ///////////////////////////////////////////////// log
