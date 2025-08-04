@@ -35,7 +35,7 @@
 #include "display.h"
 #include "sensor.h"
 #include "utils.h"
-// #include "lfs.h"
+#include "lfs_util.h"
 #include "FreeRTOS.h"
 #include "event_groups.h"
 #include "read_data_simple.h"
@@ -92,8 +92,7 @@ TaskHandle_t V_handle_task_IdleLED = NULL;
 #define EVENT7 (0x01 << 6)
 TimerHandle_t xLedTimer;
 
-        int flag =0;
-        int time_flag=0;
+bool time_flag=0;
 //任务控制权柄
 TaskHandle_t xHandleTsak[4];
 // 事件控制权柄
@@ -104,38 +103,34 @@ void eventTask2(void){
         // 设置变量接收事件
         EventBits_t r_event;
 	for (;;){
-                // myPreviousWakeTime = xTaskGetTickCount();
-                printf("I do it eventTask2\n"); 
-                time_flag=0;
 		r_event = xEventGroupWaitBits(myxEventGroupHandle_t,EVENT7,
 						pdTRUE,pdFALSE,portMAX_DELAY);
 		if((r_event&EVENT7) != 0){
+                        printf("I do it eventTask2\n"); 
+                        time_flag=false;
+
                         if (xTimerReset(xLedTimer, 0) != pdPASS) {
-                                printf("rain Timer reset failed\n");
+                                printf("Timer reset failed\n");
                         }
+
                         while(!HAL_GPIO_ReadPin(GPIOB ,GPIO_PIN_11)){
-                                printf("I will die \n");
-                                if(time_flag){
-                                        printf("rain I am die1\n");
+                                if(time_flag)
                                         break;
-                                }
                         }
+
                         // 主动关闭定时器
                         if (xTimerStop(xLedTimer, 0) != pdPASS) {
-                                printf("rain Timer stop failed\n");
+                                printf("Timer stop failed\n");
                                 return;
                         }
-                        if(time_flag){
-                                if(button_press_pattern_scan()==LONG_PRESS_STATE){
-                                        printf("rain I am die2\n");   
-                                        PowerDown;
-                                }else{
-                                        printf("I am alive333\n");
-                                        time_flag=0;
-                                }
-                        }else{
-                                printf("I am alive\n");
+
+                        if(time_flag && button_press_pattern_scan()==LONG_PRESS_STATE){
+                                printf("rain I am die2\n");   
+                                PowerDown;
                         }
+
+                        time_flag=false;
+                        printf("I am alive\n");
                 }
         }
 }
@@ -162,14 +157,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 
 void vTimerCallback(TimerHandle_t xTimer) {
         // 定时器触发时执行的操作
-        flag = !flag;
-
-        BLUE_LED(!flag);
-        RED_LED(flag);
-
-        time_flag=1;
-
-        printf("Timer Callback: flag=%d\n", flag);
+        time_flag=true;
 }
 /* USER CODE END PV */
 
@@ -195,6 +183,7 @@ void ui_task(void* arg)
 void gesture_task(void* arg){
 
         ButtonState buttonState = IDLE_STATE;
+
         while(1){
                 buttonState = button_press_pattern_scan();
 
@@ -212,7 +201,6 @@ void gesture_task(void* arg){
                                 RED_LED(1);
                                 break;
                 }
-                // delay_ms(10);
         }
 }
 #define lis2dh12_INT1_GPIO_Port   GPIOA
@@ -223,14 +211,13 @@ void gesture_task(void* arg){
 void sensor_task(void* arg)
 { 
         // enable_fifo(&dev_ctx);
+ 
+        lfs_first_run(); 
 
-        while(1)
-        {
-                        spi_flash_test();
-                // BLUE_LED(1);
-                // ENABLE_DC(0);
+        while(1){
                 // get_sensor_value(sht,adc_value);
                 lis2dh12_read_data(&dev_ctx);
+
                 // HAL_GPIO_ReadPin(GPIOB ,GPIO_PIN_0) ;//INT1
                 // read_fifo(&dev_ctx);
                 //check INT2
@@ -248,7 +235,7 @@ void sensor_task(void* arg)
                 // }else{
                 //         printf("I no get \n");
                 // }
-                delay_ms(1000);
+                delay_ms(2000);
                 //   while (pwmVal< 500)
                 //   {
                 // 	  pwmVal++;
@@ -322,23 +309,19 @@ int main(void)
         
         lis2dh12_init(&dev_ctx);
         // sensor_init(sht,adc_value,hadc1);
-
         // i2c_eeprom_test(m24c02);
         // ui_test(u8g2);
-        // lfs_test();
-
-             
         
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-        xTaskCreate((TaskFunction_t)Creator,                 /* 任务入口函数 */
-                (const char *)"Creator",                 /* 任务名字 */
-                (uint16_t)512,                           /* 任务栈大小 */
-                (void *)NULL,                            /* 任务入口函数参数 */
-                (UBaseType_t)10,                         /* 任务的优先级 */
-                (TaskHandle_t *)&V_handle_task_Creator);/* 任务控制块指针 */
+        xTaskCreate((TaskFunction_t)Creator,
+                (const char *)"Creator",               
+                (uint16_t)128,                           
+                (void *)NULL,                          
+                (UBaseType_t)10,                         
+                (TaskHandle_t *)&V_handle_task_Creator);
         // xTaskCreate(ui_task, "ui_task", 128, NULL, 5, NULL);
 
 
@@ -414,15 +397,16 @@ static void Creator(void){
                                         (const char *)"sensor_task",             /* 任务名字 */
                                         (uint16_t)256,                               /* 任务栈大小 */
                                         (void *)NULL,                                /* 任务入口函数参数 */
-                                        (UBaseType_t)10,                             /* 任务的优先级 */
+                                        (UBaseType_t)3,                             /* 任务的优先级 */
                                         (TaskHandle_t *)&V_handle_task_DeviceStart); /* 任务控制块指针 */
                 
         xTaskCreate((TaskFunction_t)gesture_task,           
                                         (const char *)"gesture_task",          
-                                        (uint16_t)256,                        
+                                        (uint16_t)128,                        
                                         (void *)NULL,                   
-                                        (UBaseType_t)1,                        
+                                        (UBaseType_t)10,                        
                                         (TaskHandle_t *)&V_handle_task_IdleLED);
+
 	xTaskCreate((TaskFunction_t )eventTask2,
                                         (const char *)"eventTask2",
                                         (uint16_t)128,

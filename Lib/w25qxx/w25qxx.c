@@ -237,7 +237,7 @@ uint8_t w25qxx_erase_chip()
 {
     uint8_t  cmd[4];
     uint32_t tickstart = HAL_GetTick();
-    cmd[0]             = SECTOR_ERASE_CMD;
+    cmd[0]             = CHIP_ERASE_CMD;
 
     /* Enable write operations */
     w25qxx_write_enable();
@@ -248,7 +248,6 @@ uint8_t w25qxx_erase_chip()
     w25qxx_transmit(cmd, 1);
     /*Deselect the FLASH: Chip Select high */
     w25qxx_disable();
-
     /* Wait the end of Flash writing */
     while (w25qxx_getstatus() != W25Qx_BUSY)
         ;

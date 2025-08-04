@@ -1,12 +1,12 @@
 #include "storage.h"
-
+#include "lfs.h"
 
 void spi_flash_test()
 {
         uint8_t  ID[4];
         uint8_t  i;
-        uint8_t  wData[0x100];
-        uint8_t  rData[0x100];
+        uint8_t  wData[100];
+        uint8_t  rData[100];
 	printf("SPI-W25Qxxx Example \n");
 
         /*1- Read the device ID */
@@ -30,39 +30,50 @@ void spi_flash_test()
         }
 
 
-        // /*-2- Written to the flash */
-        // /* fill buffer */
-        // for (i = 0; i < 0x100; i++) {
-        //         wData[i] = i;
-        //         rData[i] = 0;
-        // }
+        /*-2- Written to the flash */
+        /* fill buffer */
+        for (i = 0; i < 100; i++) {
+                wData[i] = i;
+                rData[i] = 0;
+        }
 
-        // if (w25qxx_write(wData, 0x00, 0x100) == W25Qx_OK)
-        //         printf(" SPI Write ok\n");
-        // // else
-        // //         Error_Handler();
+        if (w25qxx_write(wData, 0x00, 100) == W25Qx_OK)
+                printf(" SPI Write ok\n");
+        else{
+                printf(" SPI Write error\n");
+                return;
+        }
 
-        // /* 3- Read the flash */
-        // if (w25qxx_read(rData, 0x00, 0x100) == W25Qx_OK)
-        //         printf(" SPI Read ok\n");
-        // // else
-        // //         Error_Handler();
+        /* 3- Read the flash */
+        if (w25qxx_read(rData, 0x00, 100) == W25Qx_OK)
+                printf(" SPI Read ok\n");
+        else{
+                printf(" SPI Read error\n");
+                return;
+        }
 
-        // printf("SPI Read Data : \n");
+        printf("SPI Read Data : \n");
 
-        // for (i = 0; i < 0x100; i++)
-        //         printf("0x%02X  ", rData[i]);
-        // printf("\n");
+        for (i = 0; i < 100; i++)
+                printf("0x%02X  ", rData[i]);
+        printf("\n");
 
-        // /* 4- check date */
-        // if (memcmp(wData, rData, 0x100) == 0){
-        //         printf(" W25Q64FV SPI Test OK\n");
-        // }
-        // else{
-        //         printf(" W25Q64FV SPI Test False\n");
-        // }
+        /* 4- check date */
+        if (memcmp(wData, rData, 100) == 0){
+                printf(" W25Q64FV SPI Test OK\n");
+        }
+        else{
+                printf(" W25Q64FV SPI Test False\n");
+        }
+        if (w25qxx_erase_chip() == W25Qx_OK)
+                printf(" SPI Erase chip ok\n");
+        else{
+                printf(" SPI Erase chip error\n");
+                return;
+        }
 
-        // return ;
+        
+        return ;
 } 
 
 

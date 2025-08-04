@@ -20,7 +20,7 @@ ButtonState button_press_pattern_scan(void){
         TickType_t ReleaseTime = 0;
 
         while (1){
-                vTaskDelay (10);
+                delay_ms(20);
                 int keyStatus = HAL_GPIO_ReadPin(KEY1_INT_GPIO_PORT, KEY1_INT_GPIO_PIN);  //检测按键
                 TickType_t currentTime = xTaskGetTickCount();
 

@@ -534,7 +534,7 @@ void lis2dh12_read_data(stmdev_ctx_t *dev_ctx){
         
                         sprintf((char*)tx_buffer, "Acceleration [mg]:%4.2f\t%4.2f\t%4.2f\r\n",
                                 acceleration_mg[0], acceleration_mg[1], acceleration_mg[2]);
-                        //tx_com( tx_buffer, strlen( (char const*)tx_buffer ) );
+                        // tx_com( tx_buffer, strlen( (char const*)tx_buffer ) );
                         
                 }
         
@@ -566,6 +566,6 @@ void lis2dh12_read_data(stmdev_ctx_t *dev_ctx){
                         sample.new_angle_x = 180-sample.new_angle_x;
                         sample.new_angle_y = 180-sample.new_angle_y;
                 }
-                printf("sample->new_angle_x:%d, sample->new_angle_y:%d, sample->new_angle_z:%d \r\n",sample.new_angle_x, sample.new_angle_y, sample.new_angle_z);
+                // printf("sample->new_angle_x:%d, sample->new_angle_y:%d, sample->new_angle_z:%d \r\n",sample.new_angle_x, sample.new_angle_y, sample.new_angle_z);
 
 }
