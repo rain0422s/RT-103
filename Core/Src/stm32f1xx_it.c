@@ -24,6 +24,7 @@
 /* USER CODE BEGIN Includes */
  #include "FreeRTOS.h"
  #include "task.h"
+ #include "lvgl.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -192,6 +193,7 @@ void SysTick_Handler(void)
 {
   /* USER CODE BEGIN SysTick_IRQn 0 */
         xPortSysTickHandler();
+        lv_tick_inc(1);
   /* USER CODE END SysTick_IRQn 0 */
 
   /* USER CODE BEGIN SysTick_IRQn 1 */

@@ -84,20 +84,12 @@ static void Creator(void); /* 用于创建和初始化FreeRTOS中的所有任务
 static TaskHandle_t V_handle_task_Creator = NULL;
 TaskHandle_t V_handle_task_DeviceStart = NULL;
 TaskHandle_t V_handle_task_IdleLED = NULL;
- 
- 
-// static uint32_t send_data1=1;
-// static uint32_t send_data2=1;
-
-// 声明事件
-#define EVENT7 (0x01 << 6)
+TaskHandle_t xHandleTsak = NULL;
 TimerHandle_t xLedTimer;
-
-bool time_flag=0;
-//任务控制权柄
-TaskHandle_t xHandleTsak[4];
-// 事件控制权柄
+#define EVENT7 (0x01 << 6)
+bool time_flag=false;
 EventGroupHandle_t myxEventGroupHandle_t = NULL;
+
 void eventTask2(void){
         // static portTickType myPreviousWakeTime;
         ButtonState buttonState = IDLE_STATE;
@@ -118,9 +110,7 @@ void eventTask2(void){
                         while(!HAL_GPIO_ReadPin(POWERKEY_GPIO_PORT ,POWERKEY_GPIO_PIN) && !time_flag){
                                 delay_ms(1);
                         }
-                        
 
-                        // 主动关闭定时器
                         if (xTimerStop(xLedTimer, 0) != pdPASS) {
                                 printf("Timer stop failed\n");
                                 return;
@@ -131,7 +121,6 @@ void eventTask2(void){
                                 PowerDown;
                         }
 
-                        time_flag=false;
                         printf("I am alive\n");
                 }
         }
@@ -158,7 +147,6 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 }
 
 void vTimerCallback(TimerHandle_t xTimer) {
-        // 定时器触发时执行的操作
         time_flag=true;
 }
 /* USER CODE END PV */
@@ -413,7 +401,7 @@ static void Creator(void){
                                         (uint16_t)128,
                                         (void*) NULL,
                                         2,
-                                        &xHandleTsak[2]);
+                                        &xHandleTsak);
 	// 创建事件
 	myxEventGroupHandle_t = xEventGroupCreate();
 	if(!myxEventGroupHandle_t)

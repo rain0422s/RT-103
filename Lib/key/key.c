@@ -24,7 +24,7 @@ ButtonState button_scan(bool istiming ,ButtonState *buttonState){
 
                 switch (*buttonState){
                         case IDLE_STATE:
-                                if(istiming && currentTime - startTime > 2000){
+                                if(istiming && currentTime - startTime > 4000){
                                         printf ("IDLE_STATE\r\n");
                                         return IDLE_STATE;
                                 }

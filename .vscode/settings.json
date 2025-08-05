@@ -51,7 +51,10 @@
                 "tuple": "c",
                 "utility": "c",
                 "key.h": "c",
-                "dma.h": "c"
+                "dma.h": "c",
+                "lv_conf_internal.h": "c",
+                "lvgl_private.h": "c",
+                "lvgl.h": "c"
         },
         "C_Cpp.errorSquiggles": "disabled"
 }
