@@ -789,7 +789,7 @@ int lfs_migrate(lfs_t *lfs, const struct lfs_config *cfg);
 #endif
 #endif
 
-int lfs_first_run(void);
+
 #ifdef __cplusplus
 } /* extern "C" */
 #endif

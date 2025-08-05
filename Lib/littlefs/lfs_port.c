@@ -1,6 +1,7 @@
 #include "lfs.h"
 #include "w25qxx.h"
-#define OFFSETBLOCK 		5
+#include "lfs_port.h"
+#define OFFSETBLOCK 		3
 /**
  * lfs与底层flash读数据接口
  * @param  c

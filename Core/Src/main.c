@@ -36,6 +36,7 @@
 #include "sensor.h"
 #include "utils.h"
 #include "lfs_util.h"
+#include "lfs_port.h"
 #include "FreeRTOS.h"
 #include "event_groups.h"
 #include "read_data_simple.h"
@@ -71,6 +72,8 @@ stmdev_ctx_t dev_ctx;
 
 #define PowerOn         HAL_GPIO_WritePin(GPIOB, GPIO_PIN_10, GPIO_PIN_SET);
 #define PowerDown       HAL_GPIO_WritePin(GPIOB, GPIO_PIN_10, GPIO_PIN_RESET);
+#define POWERKEY_GPIO_PORT      GPIOB
+#define POWERKEY_GPIO_PIN       GPIO_PIN_11
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
@@ -97,7 +100,7 @@ TaskHandle_t xHandleTsak[4];
 EventGroupHandle_t myxEventGroupHandle_t = NULL;
 void eventTask2(void){
         // static portTickType myPreviousWakeTime;
-        
+        ButtonState buttonState = IDLE_STATE;
         // 设置变量接收事件
         EventBits_t r_event;
 	for (;;){
@@ -112,7 +115,7 @@ void eventTask2(void){
                                 return;
                         }
 
-                        while(!HAL_GPIO_ReadPin(GPIOB ,GPIO_PIN_11) && !time_flag){
+                        while(!HAL_GPIO_ReadPin(POWERKEY_GPIO_PORT ,POWERKEY_GPIO_PIN) && !time_flag){
                                 delay_ms(1);
                         }
                         
@@ -122,9 +125,9 @@ void eventTask2(void){
                                 printf("Timer stop failed\n");
                                 return;
                         }
-
-                        if(time_flag && button_press_pattern_scan()==LONG_PRESS_STATE){
-                                printf("rain I am die2\n");   
+                        printf("I will die\n");
+                        if(time_flag && button_scan(true,&buttonState) == LONG_PRESS_STATE){
+                                printf("I am die2\n");   
                                 PowerDown;
                         }
 
@@ -140,10 +143,10 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 	uint32_t ulReturn;
 	uint16_t event;
 	ulReturn = taskENTER_CRITICAL_FROM_ISR();
-	GPIO_PinState pinState = HAL_GPIO_ReadPin( GPIOB,GPIO_Pin );
+	GPIO_PinState pinState = HAL_GPIO_ReadPin( POWERKEY_GPIO_PORT , GPIO_Pin );
 	if(pinState == GPIO_PIN_RESET ){
 		// 判断中断位置 
-		if(GPIO_Pin == GPIO_PIN_11 ){
+		if(GPIO_Pin == POWERKEY_GPIO_PIN ){
 			event = EVENT7;
 		}
 		xEventGroupSetBitsFromISR(myxEventGroupHandle_t,event,
@@ -183,11 +186,8 @@ void ui_task(void* arg)
 void gesture_task(void* arg){
 
         ButtonState buttonState = IDLE_STATE;
-
         while(1){
-                buttonState = button_press_pattern_scan();
-
-                switch (buttonState){
+                switch(button_scan(false,&buttonState)){
                         case SHORT_PRESS_STATE:
                                 BLUE_LED(1);
                                 RED_LED(0);
@@ -201,6 +201,7 @@ void gesture_task(void* arg){
                                 RED_LED(1);
                                 break;
                 }
+                delay_ms(10);
         }
 }
 #define lis2dh12_INT1_GPIO_Port   GPIOA
