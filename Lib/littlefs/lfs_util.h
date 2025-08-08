@@ -43,7 +43,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include <inttypes.h>
-
+#include "FreeRTOS.h"
 #ifndef LFS_NO_MALLOC
 #include <stdlib.h>
 #endif
@@ -68,6 +68,7 @@ extern "C"
 // code footprint
 
 // Logging functions
+#define LFS_YES_TRACE
 #ifndef LFS_TRACE
 #ifdef LFS_YES_TRACE
 #define LFS_TRACE_(fmt, ...) \
@@ -113,6 +114,13 @@ extern "C"
 #ifndef LFS_NO_ASSERT
 #define LFS_ASSERT(test) assert(test)
 #else
+#define assert(x)            \
+    if ((x) == 0)                 \
+    {                             \
+        __asm volatile("ebreak"); \
+        for (;;)                  \
+            ;                     \
+    }
 #define LFS_ASSERT(test)
 #endif
 #endif
@@ -246,7 +254,9 @@ static inline void *lfs_malloc(size_t size) {
 #if defined(LFS_MALLOC)
     return LFS_MALLOC(size);
 #elif !defined(LFS_NO_MALLOC)
-    return malloc(size);
+//     return malloc(size);
+        extern void *pvPortMalloc( size_t xWantedSize );
+        return pvPortMalloc(size);
 #else
     (void)size;
     return NULL;
@@ -258,7 +268,9 @@ static inline void lfs_free(void *p) {
 #if defined(LFS_FREE)
     LFS_FREE(p);
 #elif !defined(LFS_NO_MALLOC)
-    free(p);
+//     free(p);
+        extern void vPortFree( void *pv );
+        vPortFree(p);
 #else
     (void)p;
 #endif
