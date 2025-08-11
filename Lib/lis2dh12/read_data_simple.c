@@ -95,7 +95,7 @@ static uint8_t tx_buffer[TX_BUF_DIM];
  *   correct interface but the usage uf "*handle" is not mandatory.
  */
 
-static int32_t platform_write(void *handle, uint8_t Reg, uint8_t *Bufp,
+static int32_t platform_write(void *handle, uint8_t Reg, const uint8_t *Bufp,
                               uint16_t len){
         if (handle == &hi2c1){
                 /* enable auto incremented in multiple read/write commands */
@@ -289,14 +289,14 @@ void enable_fifo(stmdev_ctx_t *dev_ctx){
 
 }
 void read_fifo(stmdev_ctx_t *dev_ctx){
-        u_int8_t val;
+        uint8_t val;
         lis2dh12_fifo_data_level_get(dev_ctx,&val);
         printf("fifo data level:%d\n",val);
         if(val == 30){
                 for(int i = 0 ; i < 30 ; i++){
                         /* Read magnetic field data */
                         memset(data_raw_acceleration.u8bit, 0x00, 3*sizeof(int16_t));
-                        lis2dh12_acceleration_raw_get(dev_ctx, data_raw_acceleration.u8bit);
+                        lis2dh12_acceleration_raw_get(dev_ctx, data_raw_acceleration.i16bit);
                         acceleration_mg[0] = LIS2DH12_FROM_FS_2g_HR_TO_mg( data_raw_acceleration.i16bit[0] );
                         acceleration_mg[1] = LIS2DH12_FROM_FS_2g_HR_TO_mg( data_raw_acceleration.i16bit[1] );
                         acceleration_mg[2] = LIS2DH12_FROM_FS_2g_HR_TO_mg( data_raw_acceleration.i16bit[2] );
@@ -374,8 +374,8 @@ void enable_inertial_wakeup(stmdev_ctx_t *dev_ctx){
         lis2dh12_filter_reference_get(dev_ctx,&ctrl_reg);
 
         // 9.将2Ah写入INT1_CFG // 配置所需唤醒事件
-        ctrl_reg = 0x3F;
-        lis2dh12_int1_gen_conf_set(dev_ctx,&ctrl_reg);
+         ctrl_reg = 0x3F;
+        lis2dh12_int1_gen_conf_set(dev_ctx,(lis2dh12_int1_cfg_t*)&ctrl_reg);
 
         // 10.轮询INT1焊盘；如果INT1=0，则转至9
         // 轮询INT1引脚等待唤醒事件
@@ -394,7 +394,7 @@ void clear_init1(stmdev_ctx_t *dev_ctx){
         uint8_t ctrl_reg;
         // ctrl_reg = 0x2A;
         // lis2dh12_int1_gen_conf_set(dev_ctx,&ctrl_reg);
-        lis2dh12_int1_gen_source_get(dev_ctx,&ctrl_reg);
+        lis2dh12_int1_gen_source_get(dev_ctx,(lis2dh12_int1_src_t*)&ctrl_reg);
         printf("INT1_SRC:0x%x\n",ctrl_reg);
 
 }
@@ -410,7 +410,7 @@ void enable_activity_recognition(stmdev_ctx_t *dev_ctx){
         lis2dh12_act_timeout_set(dev_ctx,set_time(dev_ctx,2));//2.01s
         
         val = 0b00001010;
-        lis2dh12_pin_int2_config_set(dev_ctx,&val);
+        lis2dh12_pin_int2_config_set(dev_ctx,(lis2dh12_ctrl_reg6_t*)&val);
 
         /*
         * Set device in continuos mode
@@ -527,7 +527,7 @@ void lis2dh12_read_data(stmdev_ctx_t *dev_ctx){
                 if(reg.status_reg.zyxda){
                         /* Read magnetic field data */
                         memset(data_raw_acceleration.u8bit, 0x00, 3*sizeof(int16_t));
-                        lis2dh12_acceleration_raw_get(dev_ctx, data_raw_acceleration.u8bit);
+                        lis2dh12_acceleration_raw_get(dev_ctx, data_raw_acceleration.i16bit);
                         acceleration_mg[0] = LIS2DH12_FROM_FS_2g_HR_TO_mg( data_raw_acceleration.i16bit[0] );
                         acceleration_mg[1] = LIS2DH12_FROM_FS_2g_HR_TO_mg( data_raw_acceleration.i16bit[1] );
                         acceleration_mg[2] = LIS2DH12_FROM_FS_2g_HR_TO_mg( data_raw_acceleration.i16bit[2] );
@@ -542,7 +542,7 @@ void lis2dh12_read_data(stmdev_ctx_t *dev_ctx){
                 if(reg.byte){
                         /* Read temperature data */
                         memset(data_raw_temperature.u8bit, 0x00, sizeof(int16_t));
-                        lis2dh12_temperature_raw_get(dev_ctx, data_raw_temperature.u8bit);
+                        lis2dh12_temperature_raw_get(dev_ctx, data_raw_acceleration.i16bit);
                         temperature_degC = LIS2DH12_FROM_LSB_TO_degC_HR( data_raw_temperature.i16bit );
         
                         sprintf((char*)tx_buffer, "Temperature [degC]:%6.2f\r\n", temperature_degC );

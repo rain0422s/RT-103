@@ -6,8 +6,7 @@
 #include "stm32f1xx_hal.h"
 #include "FreeRTOS.h"
 #include "task.h"
-
-
+extern void vPortSetupTimerInterrupt(void);
 // static void HAL_Delay_us(uint32_t us)
 // {
 //     HAL_SYSTICK_Config(HAL_RCC_GetHCLKFreq() / 1000000);

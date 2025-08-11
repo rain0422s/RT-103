@@ -4,7 +4,7 @@
 #include "i2c.h"
 #include "crc8.h"
 #include "stdio.h"
-
+#include "utils.h"
 #define SHT3X_DEBUG_LOG 0
 #if SHT3X_DEBUG_LOG
 #define SHT3X_TAG "[SHT3X_SENSOR]"

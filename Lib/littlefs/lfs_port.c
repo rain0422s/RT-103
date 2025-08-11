@@ -93,7 +93,7 @@ const struct lfs_config lfs_w25qxx_cfg =
         .name_max=128,
         .file_max=128, 
         .attr_max=128,
-        .context=512,
+        // .context=512,
 
         // 使用静态内存必须设置这几个缓存
 
