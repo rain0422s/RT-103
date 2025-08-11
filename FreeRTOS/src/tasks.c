@@ -40,7 +40,7 @@
 #include "task.h"
 #include "timers.h"
 #include "stack_macros.h"
-
+#include "lvgl.h"
 /* The default definitions are only available for non-MPU ports. The
  * reason is that the stack alignment requirements vary for different
  * architectures.*/
@@ -8693,4 +8693,10 @@ void vTaskResetState( void )
     }
     #endif /* #if ( configGENERATE_RUN_TIME_STATS == 1 ) */
 }
+
+void vApplicationTickHook( void )
+{
+        lv_tick_inc(1);
+}
+
 /*-----------------------------------------------------------*/

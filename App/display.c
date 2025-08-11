@@ -1,4 +1,15 @@
 #include "display.h"
+void demo_run(void){
+        lv_init();
+        lv_port_disp_init();
+        // lv_demo_widgets();
+        while (1)
+        {
+                delay_ms(10);
+                lv_timer_handler();
+        }
+
+}
 #ifdef U8G2_ENABLED
 #define CHECK_KEY(n)  n?  HAL_GPIO_ReadPin(GPIOB ,GPIO_PIN_5) : HAL_GPIO_ReadPin(GPIOB ,GPIO_PIN_1);
 /*循环输出字符，同时输出两端字符，x轴不断改变实现移动UI
@@ -216,6 +227,4 @@ void ui_test(u8g2_t u8g2){
         u8g2_SetFont(&u8g2, u8g2_font_luIS12_te);//设置字体	
         frame_len = frame_len_trg = list[ui_select].len*12;
 }
-
-
 #endif

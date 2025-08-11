@@ -1,6 +1,8 @@
 #ifndef __DISPLAY_H
 #define __DISPLAY_H
 #include "utils.h"
+#include "lv_init.h"
+#include "lv_port_disp.h"
 #ifdef U8G2_ENABLED
 #include "oled.h"
 static const unsigned char u8g_logo_bits[] U8X8_PROGMEM =

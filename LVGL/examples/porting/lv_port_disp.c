@@ -4,17 +4,20 @@
  */
 
 /*Copy this file as "lv_port_disp.c" and set this value to "1" to enable content*/
-#if 0
+#if 1
 
 /*********************
  *      INCLUDES
  *********************/
-#include "lv_port_disp_template.h"
+#include "lv_port_disp.h"
 #include <stdbool.h>
-
+// #include "lcd.h"
 /*********************
  *      DEFINES
  *********************/
+#define MY_DISP_HOR_RES 128
+#define MY_DISP_VER_RES 160
+
 #ifndef MY_DISP_HOR_RES
     #warning Please define or replace the macro MY_DISP_HOR_RES with the actual screen width, default value 320 is used for now.
     #define MY_DISP_HOR_RES    320
@@ -63,6 +66,7 @@ void lv_port_disp_init(void)
     lv_display_t * disp = lv_display_create(MY_DISP_HOR_RES, MY_DISP_VER_RES);
     lv_display_set_flush_cb(disp, disp_flush);
 
+#if 0
     /* Example 1
      * One buffer for partial rendering*/
     LV_ATTRIBUTE_MEM_ALIGN
@@ -78,6 +82,7 @@ void lv_port_disp_init(void)
     LV_ATTRIBUTE_MEM_ALIGN
     static uint8_t buf_2_2[MY_DISP_HOR_RES * 10 * BYTE_PER_PIXEL];
     lv_display_set_buffers(disp, buf_2_1, buf_2_2, sizeof(buf_2_1), LV_DISPLAY_RENDER_MODE_PARTIAL);
+#endif
 
     /* Example 3
      * Two buffers screen sized buffer for double buffering.
@@ -99,6 +104,8 @@ void lv_port_disp_init(void)
 static void disp_init(void)
 {
     /*You code here*/
+        // lcd_init();
+
 }
 
 volatile bool disp_flush_enabled = true;

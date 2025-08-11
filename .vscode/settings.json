@@ -54,7 +54,14 @@
                 "dma.h": "c",
                 "lv_conf_internal.h": "c",
                 "lvgl_private.h": "c",
-                "lvgl.h": "c"
+                "lvgl.h": "c",
+                "lv_examples.h": "c",
+                "lv_init.h": "c",
+                "lv_demo_benchmark.h": "c",
+                "stdlib.h": "c",
+                "lv_tick_private.h": "c",
+                "lv_tick.h": "c",
+                "stack_macros.h": "c"
         },
         "C_Cpp.errorSquiggles": "disabled"
 }

@@ -40,7 +40,7 @@
 // 是否使用空闲钩子函数
 #define configUSE_IDLE_HOOK                     0
 // 是否使用TICK嘀嗒钩子函数
-#define configUSE_TICK_HOOK                     0
+#define configUSE_TICK_HOOK                     1
 // 是否使用栈溢出检查
 #define configCHECK_FOR_STACK_OVERFLOW          0
 // 是否使用内存申请失败钩子函数
