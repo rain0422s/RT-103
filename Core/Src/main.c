@@ -154,11 +154,23 @@ uart_dev_t master_uart = {
 
 
 /* ----------------- 任务实现 ----------------- */
-#define MAX_TX_BUF_LEN (USART_LEN + 1)  // 预留1字节给标志位
+
+static void forward_uart(uart_dev_t *dst, uint8_t *data, uint16_t size)
+{
+    taskENTER_CRITICAL();
+    memcpy(dst->tx_buf, data, size);
+    taskEXIT_CRITICAL();
+
+    if (xSemaphoreTake(dst->tx_sem, portMAX_DELAY) == pdTRUE) {
+        if (HAL_UART_Transmit_DMA(dst->huart, dst->tx_buf, size) != HAL_OK) {
+            xSemaphoreGive(dst->tx_sem);
+        }
+    }
+}
+
 void uart_forward_task(void *argument)
 {
     uart_event_t event;
-    uint16_t tx_size;
 
     for (;;)
     {
@@ -169,49 +181,19 @@ void uart_forward_task(void *argument)
             if (event.size == 0 || event.size > USART_LEN) continue;
 
             if (src == SLAVE_UART) {
-                // 从串口接收 → 主串口发送，数据前加0x01标志
-                tx_size = event.size + 1;
-
-                taskENTER_CRITICAL();
-                MASTER_UART->tx_buf[0] = 0x01;
-                memcpy(&MASTER_UART->tx_buf[1], SLAVE_UART->rx_buf, event.size);
-                taskEXIT_CRITICAL();
-
-                if (xSemaphoreTake(MASTER_UART->tx_sem, portMAX_DELAY) == pdTRUE) {
-                    if (HAL_UART_Transmit_DMA(MASTER_UART->huart, MASTER_UART->tx_buf, tx_size) != HAL_OK) {
-                        xSemaphoreGive(MASTER_UART->tx_sem);
-                    }
-                }
+                // 从串口 → 主串口
+                forward_uart(MASTER_UART, SLAVE_UART->rx_buf, event.size);
             }
             else if (src == MASTER_UART) {
-                // 主串口接收 → 主串口发送，数据前加0x02标志
-                tx_size = event.size + 1;
-
-                taskENTER_CRITICAL();
-                MASTER_UART->tx_buf[0] = 0x02;
-                memcpy(&MASTER_UART->tx_buf[1], MASTER_UART->rx_buf, event.size);
-                taskEXIT_CRITICAL();
-
-                if (xSemaphoreTake(MASTER_UART->tx_sem, portMAX_DELAY) == pdTRUE) {
-                    if (HAL_UART_Transmit_DMA(MASTER_UART->huart, MASTER_UART->tx_buf, tx_size) != HAL_OK) {
-                        xSemaphoreGive(MASTER_UART->tx_sem);
-                    }
-                }
-
-                // 同时通过从串口发送接收到的原始数据，无标志
-                taskENTER_CRITICAL();
-                memcpy(SLAVE_UART->tx_buf, MASTER_UART->rx_buf, event.size);
-                taskEXIT_CRITICAL();
-
-                if (xSemaphoreTake(SLAVE_UART->tx_sem, portMAX_DELAY) == pdTRUE) {
-                    if (HAL_UART_Transmit_DMA(SLAVE_UART->huart, SLAVE_UART->tx_buf, event.size) != HAL_OK) {
-                        xSemaphoreGive(SLAVE_UART->tx_sem);
-                    }
-                }
+                // 主串口 → 主串口回发
+                forward_uart(MASTER_UART, MASTER_UART->rx_buf, event.size);
+                // 主串口 → 从串口
+                forward_uart(SLAVE_UART, MASTER_UART->rx_buf, event.size);
             }
         }
     }
 }
+
 void uart_start_idle_dma(uart_dev_t *uart_dev)
 {
     HAL_UARTEx_ReceiveToIdle_DMA(uart_dev->huart, uart_dev->rx_buf, USART_LEN);
@@ -236,7 +218,7 @@ void uart_dma_init(void)
         uart_start_idle_dma(SLAVE_UART);
         uart_start_idle_dma(MASTER_UART);
 
-
+        xTaskCreate(uart_forward_task, "uart_fwd", 128, NULL, 5, &uart_forward_task_handle);
 }
 
 /* ----------------- 中断回调 ----------------- */
@@ -482,23 +464,16 @@ int main(void)
   /* USER CODE BEGIN 2 */
 //   HAL_TIM_PWM_Start(&htim3,TIM_CHANNEL_4);
         PowerOn;
-
-
-        BLUE_LED(1);
-        RED_LED(0);
-        uart_dma_init();   
-        lis2dh12_init(&dev_ctx);
         // sensor_init(sht,adc_value,hadc1);
         // i2c_eeprom_test(m24c02);
         // ui_test(u8g2);
-        printf("I have powered on.\n"); 
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
         xTaskCreate((TaskFunction_t)Creator,
                 (const char *)"Creator",               
-                (uint16_t)128,                           
+                (uint16_t)512,                           
                 (void *)NULL,                          
                 (UBaseType_t)10,                         
                 (TaskHandle_t *)&V_handle_task_Creator);
@@ -572,7 +547,8 @@ static void Creator(void){
         /**
          * @description: 任务创建区
          */
-
+        uart_dma_init();   
+        lis2dh12_init(&dev_ctx);
         xTaskCreate((TaskFunction_t)sensor_task,             /* 任务入口函数 */
                                         (const char *)"sensor_task",             /* 任务名字 */
                                         (uint16_t)512,                               /* 任务栈大小 */
@@ -594,7 +570,7 @@ static void Creator(void){
                                         2,
                                         &xHandleTsak);
 
-        xTaskCreate(uart_forward_task, "uart_fwd", 128, NULL, 5, &uart_forward_task_handle);
+
 
 	// 创建事件
 	myxEventGroupHandle_t = xEventGroupCreate();
