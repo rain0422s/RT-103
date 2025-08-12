@@ -61,7 +61,9 @@
                 "stdlib.h": "c",
                 "lv_tick_private.h": "c",
                 "lv_tick.h": "c",
-                "stack_macros.h": "c"
+                "stack_macros.h": "c",
+                "tim.h": "c",
+                "queue.h": "c"
         },
         "C_Cpp.errorSquiggles": "disabled"
 }

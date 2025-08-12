@@ -41,6 +41,8 @@
 #include "event_groups.h"
 #include "read_data_simple.h"
 #include "key.h"
+#include "queue.h"
+#include "semphr.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -85,10 +87,198 @@ static TaskHandle_t V_handle_task_Creator = NULL;
 TaskHandle_t V_handle_task_DeviceStart = NULL;
 TaskHandle_t V_handle_task_IdleLED = NULL;
 TaskHandle_t xHandleTsak = NULL;
+TaskHandle_t xHandleTsak1 = NULL;
 TimerHandle_t xLedTimer;
 #define EVENT7 (0x01 << 6)
 bool time_flag=false;
 EventGroupHandle_t myxEventGroupHandle_t = NULL;
+
+
+
+
+#define USART_LEN 64
+
+/* DMA接收缓冲 */
+uint8_t usart1_rx_DMA_buffer[USART_LEN];
+uint8_t usart2_rx_DMA_buffer[USART_LEN];
+
+
+/* 发送缓存，任务里拷贝数据后发送 */
+uint8_t usart1_tx_buf[USART_LEN];
+uint8_t usart2_tx_buf[USART_LEN];
+
+
+/* UART、DMA句柄，由CubeMX或手动定义 */
+extern DMA_HandleTypeDef hdma_usart2_rx;
+extern DMA_HandleTypeDef hdma_usart2_tx;
+extern DMA_HandleTypeDef hdma_usart1_rx;
+extern DMA_HandleTypeDef hdma_usart1_tx;
+
+/* FreeRTOS 资源 */
+typedef struct {
+    UART_HandleTypeDef *huart;
+    uint8_t *rx_buf;
+    uint8_t *tx_buf;
+    SemaphoreHandle_t tx_sem;        // 发送信号量，保护DMA发送互斥
+    DMA_HandleTypeDef *hdma_rx;
+} uart_dev_t;
+
+typedef struct {
+    uart_dev_t *dev;
+    uint16_t size;
+} uart_event_t;
+
+QueueHandle_t uart_rx_queue;
+
+/* 任务句柄 */
+TaskHandle_t uart_forward_task_handle;
+
+
+uart_dev_t slave_uart = {
+    .huart = &huart1,
+    .rx_buf = usart1_rx_DMA_buffer,
+    .tx_buf = usart1_tx_buf,
+    .tx_sem = NULL,   // 后面初始化
+    .hdma_rx = &hdma_usart1_rx,
+};
+
+uart_dev_t master_uart = {
+    .huart = &huart2,
+    .rx_buf = usart2_rx_DMA_buffer,
+    .tx_buf = usart2_tx_buf,
+    .tx_sem = NULL,   // 后面初始化
+    .hdma_rx = &hdma_usart2_rx,
+};
+#define SLAVE_UART (&slave_uart)
+#define MASTER_UART (&master_uart)
+
+
+/* ----------------- 任务实现 ----------------- */
+#define MAX_TX_BUF_LEN (USART_LEN + 1)  // 预留1字节给标志位
+void uart_forward_task(void *argument)
+{
+    uart_event_t event;
+    uint16_t tx_size;
+
+    for (;;)
+    {
+        if (xQueueReceive(uart_rx_queue, &event, portMAX_DELAY) == pdPASS)
+        {
+            uart_dev_t *src = event.dev;
+
+            if (event.size == 0 || event.size > USART_LEN) continue;
+
+            if (src == SLAVE_UART) {
+                // 从串口接收 → 主串口发送，数据前加0x01标志
+                tx_size = event.size + 1;
+
+                taskENTER_CRITICAL();
+                MASTER_UART->tx_buf[0] = 0x01;
+                memcpy(&MASTER_UART->tx_buf[1], SLAVE_UART->rx_buf, event.size);
+                taskEXIT_CRITICAL();
+
+                if (xSemaphoreTake(MASTER_UART->tx_sem, portMAX_DELAY) == pdTRUE) {
+                    if (HAL_UART_Transmit_DMA(MASTER_UART->huart, MASTER_UART->tx_buf, tx_size) != HAL_OK) {
+                        xSemaphoreGive(MASTER_UART->tx_sem);
+                    }
+                }
+            }
+            else if (src == MASTER_UART) {
+                // 主串口接收 → 主串口发送，数据前加0x02标志
+                tx_size = event.size + 1;
+
+                taskENTER_CRITICAL();
+                MASTER_UART->tx_buf[0] = 0x02;
+                memcpy(&MASTER_UART->tx_buf[1], MASTER_UART->rx_buf, event.size);
+                taskEXIT_CRITICAL();
+
+                if (xSemaphoreTake(MASTER_UART->tx_sem, portMAX_DELAY) == pdTRUE) {
+                    if (HAL_UART_Transmit_DMA(MASTER_UART->huart, MASTER_UART->tx_buf, tx_size) != HAL_OK) {
+                        xSemaphoreGive(MASTER_UART->tx_sem);
+                    }
+                }
+
+                // 同时通过从串口发送接收到的原始数据，无标志
+                taskENTER_CRITICAL();
+                memcpy(SLAVE_UART->tx_buf, MASTER_UART->rx_buf, event.size);
+                taskEXIT_CRITICAL();
+
+                if (xSemaphoreTake(SLAVE_UART->tx_sem, portMAX_DELAY) == pdTRUE) {
+                    if (HAL_UART_Transmit_DMA(SLAVE_UART->huart, SLAVE_UART->tx_buf, event.size) != HAL_OK) {
+                        xSemaphoreGive(SLAVE_UART->tx_sem);
+                    }
+                }
+            }
+        }
+    }
+}
+void uart_start_idle_dma(uart_dev_t *uart_dev)
+{
+    HAL_UARTEx_ReceiveToIdle_DMA(uart_dev->huart, uart_dev->rx_buf, USART_LEN);
+    __HAL_DMA_DISABLE_IT(uart_dev->hdma_rx, DMA_IT_HT);
+}
+
+/* ----------------- 初始化 ----------------- */
+void uart_dma_init(void)
+{
+        // 先填指针和缓冲区
+        SLAVE_UART->tx_sem = xSemaphoreCreateBinary();
+        MASTER_UART->tx_sem = xSemaphoreCreateBinary();
+
+
+        /* 初始给信号量，表示DMA可用 */
+        xSemaphoreGive(SLAVE_UART->tx_sem);
+        xSemaphoreGive(MASTER_UART->tx_sem);
+
+        uart_rx_queue = xQueueCreate(8, sizeof(uart_event_t));
+
+        /* 启动DMA空闲接收 */
+        uart_start_idle_dma(SLAVE_UART);
+        uart_start_idle_dma(MASTER_UART);
+
+
+}
+
+/* ----------------- 中断回调 ----------------- */
+void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
+{
+        BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+        uart_event_t event;
+
+        uart_dev_t *dev = NULL;
+
+        if (huart == SLAVE_UART->huart) dev = SLAVE_UART;   
+        else if (huart == MASTER_UART->huart) dev = MASTER_UART;
+        else return;
+
+        event.dev = dev;
+        event.size = Size;
+
+        /* 发送事件给任务 */
+        xQueueSendFromISR(uart_rx_queue, &event, &xHigherPriorityTaskWoken);
+
+        /* 重新启动DMA接收 */
+        uart_start_idle_dma(dev);
+
+        portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+}
+
+
+/* ----------------- 发送完成回调 ----------------- */
+void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
+{
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+    uart_dev_t *dev = NULL;
+
+        if (huart == SLAVE_UART->huart) dev = SLAVE_UART;
+        else if (huart == MASTER_UART->huart) dev = MASTER_UART;
+
+    xSemaphoreGiveFromISR(dev->tx_sem, &xHigherPriorityTaskWoken);
+    portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+}
+
+
+
 
 void eventTask2(void){
         // static portTickType myPreviousWakeTime;
@@ -206,7 +396,7 @@ void sensor_task(void* arg)
         while(1){
                 // get_sensor_value(sht,adc_value);
                 lis2dh12_read_data(&dev_ctx);
-
+                // printf("I am alive\n");
                 // HAL_GPIO_ReadPin(GPIOB ,GPIO_PIN_0) ;//INT1
                 // read_fifo(&dev_ctx);
                 //check INT2
@@ -292,15 +482,16 @@ int main(void)
   /* USER CODE BEGIN 2 */
 //   HAL_TIM_PWM_Start(&htim3,TIM_CHANNEL_4);
         PowerOn;
-        printf("I have powered on.\n"); 
+
+
         BLUE_LED(1);
         RED_LED(0);
-        
+        uart_dma_init();   
         lis2dh12_init(&dev_ctx);
         // sensor_init(sht,adc_value,hadc1);
         // i2c_eeprom_test(m24c02);
         // ui_test(u8g2);
-        
+        printf("I have powered on.\n"); 
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -402,6 +593,9 @@ static void Creator(void){
                                         (void*) NULL,
                                         2,
                                         &xHandleTsak);
+
+        xTaskCreate(uart_forward_task, "uart_fwd", 128, NULL, 5, &uart_forward_task_handle);
+
 	// 创建事件
 	myxEventGroupHandle_t = xEventGroupCreate();
 	if(!myxEventGroupHandle_t)
