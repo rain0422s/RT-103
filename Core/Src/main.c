@@ -178,21 +178,15 @@ void uart_forward_task(void *argument)
         {
             uart_dev_t *src = event.dev;
 
-            if (event.size == 0 || event.size > USART_LEN) continue;
+            if (event.size == 0 || event.size > USART_LEN) 
+                continue;
 
-            if (src == SLAVE_UART) {
-                // 从串口 → 主串口
-                forward_uart(MASTER_UART, SLAVE_UART->rx_buf, event.size);
-            }
-            else if (src == MASTER_UART) {
-                // 主串口 → 主串口回发
-                forward_uart(MASTER_UART, MASTER_UART->rx_buf, event.size);
-                // 主串口 → 从串口
-                forward_uart(SLAVE_UART, MASTER_UART->rx_buf, event.size);
-            }
+            // 谁发的 → 回发给谁
+            forward_uart(src, src->rx_buf, event.size);
         }
     }
 }
+
 
 void uart_start_idle_dma(uart_dev_t *uart_dev)
 {
@@ -218,7 +212,7 @@ void uart_dma_init(void)
         uart_start_idle_dma(SLAVE_UART);
         uart_start_idle_dma(MASTER_UART);
 
-        xTaskCreate(uart_forward_task, "uart_fwd", 128, NULL, 5, &uart_forward_task_handle);
+        xTaskCreate(uart_forward_task, "uart_fwd", 256, NULL, 5, &uart_forward_task_handle);
 }
 
 /* ----------------- 中断回调 ----------------- */
@@ -229,9 +223,8 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 
         uart_dev_t *dev = NULL;
 
-        if (huart == SLAVE_UART->huart) dev = SLAVE_UART;   
+        if (huart == SLAVE_UART->huart) dev = SLAVE_UART;
         else if (huart == MASTER_UART->huart) dev = MASTER_UART;
-        else return;
 
         event.dev = dev;
         event.size = Size;
@@ -241,7 +234,6 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 
         /* 重新启动DMA接收 */
         uart_start_idle_dma(dev);
-
         portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }
 
@@ -249,14 +241,14 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 /* ----------------- 发送完成回调 ----------------- */
 void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
 {
-    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-    uart_dev_t *dev = NULL;
+        BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+        uart_dev_t *dev = NULL;
 
         if (huart == SLAVE_UART->huart) dev = SLAVE_UART;
         else if (huart == MASTER_UART->huart) dev = MASTER_UART;
 
-    xSemaphoreGiveFromISR(dev->tx_sem, &xHigherPriorityTaskWoken);
-    portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+        xSemaphoreGiveFromISR(dev->tx_sem, &xHigherPriorityTaskWoken);
+        portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }
 
 
@@ -473,7 +465,7 @@ int main(void)
   /* USER CODE BEGIN WHILE */
         xTaskCreate((TaskFunction_t)Creator,
                 (const char *)"Creator",               
-                (uint16_t)512,                           
+                (uint16_t)1024,                           
                 (void *)NULL,                          
                 (UBaseType_t)10,                         
                 (TaskHandle_t *)&V_handle_task_Creator);

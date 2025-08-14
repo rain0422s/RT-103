@@ -33,7 +33,7 @@
 #endif
 PUTCHAR_PROTOTYPE
 {
-    HAL_UART_Transmit(&huart2 , (uint8_t *)&ch, 1,0x200);
+    HAL_UART_Transmit(&huart1 , (uint8_t *)&ch, 1,0x200);
     return ch;
 }
 
