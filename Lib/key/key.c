@@ -1,6 +1,10 @@
 #include "key.h"
+#if 0
 #define KEY1_GPIO_PORT      GPIOB
 #define KEY1_GPIO_PIN       GPIO_PIN_12
+#endif
+#define KEY1_GPIO_PORT      GPIOA
+#define KEY1_GPIO_PIN       GPIO_PIN_1
 uint16_t SHORT_CLICK_THRESHOLD = 400;  // 这个是第一次松开时间和第二次按下时间的判断时长
 uint16_t LONG_PRESS_THRESHOLD = 1000;   // 定义长按的时间阈值（以FreeRTOS时基为单位）
 uint16_t PRESS_Time = 150;             // 判断毛刺时长
