@@ -8,7 +8,7 @@
 #if CONFIG_USING_I2C
 
 #define CONFIG_USING_SOFTWARE_I2C 1  // software i2c
-#define CONFIG_USING_HARDWARE_I2C 1  // hardware i2c
+#define CONFIG_USING_HARDWARE_I2C 0  // hardware i2c
 
 #endif
 

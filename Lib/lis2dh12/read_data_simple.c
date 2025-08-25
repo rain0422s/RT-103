@@ -151,7 +151,6 @@ static int32_t platform_read(void *handle, uint8_t Reg, uint8_t *Bufp,
                 HAL_GPIO_WritePin(CS_SPI1_GPIO_Port, CS_SPI1_Pin, GPIO_PIN_SET);
         }
         #endif
-// printf("I do platform_read cmd:%x,str:%s\n",Reg,Bufp);
         return 0;
 }
 
@@ -494,23 +493,23 @@ void lis2dh12_init(){
         // /*
         // *  Enable Block Data Update
         // */
-        // lis2dh12_block_data_update_set(dev_ctx, PROPERTY_ENABLE);
+        // lis2dh12_block_data_update_set(&dev_ctx, PROPERTY_ENABLE);
         // /*
         // * Set Output Data Rate
         // */
-        // lis2dh12_data_rate_set(dev_ctx, dev_ctx->odr);
+        // lis2dh12_data_rate_set(&dev_ctx, dev_ctx.odr);
         // /*
         // * Set full scale
         // */      
-        // lis2dh12_full_scale_set(dev_ctx,dev_ctx->fs);
+        // lis2dh12_full_scale_set(&dev_ctx,dev_ctx.fs);
         // /*
         // * Enable temperature sensor
         // */   
-        // lis2dh12_temperature_meas_set(dev_ctx, LIS2DH12_TEMP_ENABLE);
+        // lis2dh12_temperature_meas_set(&dev_ctx, LIS2DH12_TEMP_ENABLE);
         // /*
         // * Set device in continuos mode
         // */   
-        // lis2dh12_operating_mode_set(dev_ctx, dev_ctx->mode);
+        // lis2dh12_operating_mode_set(&dev_ctx, dev_ctx.mode);
 
         
 }

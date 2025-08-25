@@ -548,7 +548,7 @@ static void Creator(void){
                 
         xTaskCreate((TaskFunction_t)gesture_task,           
                                         (const char *)"gesture_task",          
-                                        (uint16_t)1024,                        
+                                        (uint16_t)768,                        
                                         (void *)NULL,                   
                                         (UBaseType_t)10,                        
                                         (TaskHandle_t *)&V_handle_task_IdleLED);
