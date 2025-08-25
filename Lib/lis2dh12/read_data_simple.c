@@ -465,48 +465,52 @@ lis2dh12_filter_reference_get(dev_ctx,&ctrl_reg);
 
 
 /* Main Example --------------------------------------------------------------*/
-void lis2dh12_init(stmdev_ctx_t *dev_ctx){
+void lis2dh12_init(){
         /*
         *  Initialize mems driver interface
         */
-        // stmdev_ctx_t dev_ctx;
+        stmdev_ctx_t dev_ctx;
 
-        dev_ctx->write_reg = platform_write;
-        dev_ctx->read_reg  = platform_read;
-        dev_ctx->handle    = &hspi2;
-        dev_ctx->fs        = LIS2DH12_2g;
-        dev_ctx->odr       = LIS2DH12_ODR_400Hz;
-        dev_ctx->mode      = LIS2DH12_HR_12bit;
+        dev_ctx.write_reg = platform_write;
+        dev_ctx.read_reg  = platform_read;
+        dev_ctx.handle    = &hspi2;
+        dev_ctx.fs        = LIS2DH12_2g;
+        dev_ctx.odr       = LIS2DH12_ODR_400Hz;
+        dev_ctx.mode      = LIS2DH12_HR_12bit;
         /*
         *  Check device ID
         */
         whoamI = 0;
-        lis2dh12_device_id_get(dev_ctx, &whoamI);
-        if ( whoamI != LIS2DH12_ID )
-                while(1); /*manage here device not found */
+        lis2dh12_device_id_get(&dev_ctx, &whoamI);
+        if ( whoamI != LIS2DH12_ID ){
+                printf("error\n");
+        }else{
+                printf("SUCCESS\n");
+        }
+                // while(1); /*manage here device not found */
 
 
         
-        /*
-        *  Enable Block Data Update
-        */
-        lis2dh12_block_data_update_set(dev_ctx, PROPERTY_ENABLE);
-        /*
-        * Set Output Data Rate
-        */
-        lis2dh12_data_rate_set(dev_ctx, dev_ctx->odr);
-        /*
-        * Set full scale
-        */      
-        lis2dh12_full_scale_set(dev_ctx,dev_ctx->fs);
-        /*
-        * Enable temperature sensor
-        */   
-        lis2dh12_temperature_meas_set(dev_ctx, LIS2DH12_TEMP_ENABLE);
-        /*
-        * Set device in continuos mode
-        */   
-        lis2dh12_operating_mode_set(dev_ctx, dev_ctx->mode);
+        // /*
+        // *  Enable Block Data Update
+        // */
+        // lis2dh12_block_data_update_set(dev_ctx, PROPERTY_ENABLE);
+        // /*
+        // * Set Output Data Rate
+        // */
+        // lis2dh12_data_rate_set(dev_ctx, dev_ctx->odr);
+        // /*
+        // * Set full scale
+        // */      
+        // lis2dh12_full_scale_set(dev_ctx,dev_ctx->fs);
+        // /*
+        // * Enable temperature sensor
+        // */   
+        // lis2dh12_temperature_meas_set(dev_ctx, LIS2DH12_TEMP_ENABLE);
+        // /*
+        // * Set device in continuos mode
+        // */   
+        // lis2dh12_operating_mode_set(dev_ctx, dev_ctx->mode);
 
         
 }

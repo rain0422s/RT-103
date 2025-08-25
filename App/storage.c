@@ -77,43 +77,36 @@ void spi_flash_test()
 } 
 
 
-void i2c_eeprom_init(struct i2c_cli at24cxx ){
+
+void i2c_eeprom_test(){
+        int i = 0;
+        object_t obj;
+        struct i2c_cli m24c02;
+
 
         static soft_i2c_t swi2c3_bus = {
                 .SCL_Port = GPIOB,
-                .SCL_Pin  = GPIO_PIN_3,
-                .SDA_Port = GPIOB,
-                .SDA_Pin  = GPIO_PIN_4,
+                .SCL_Pin  = GPIO_PIN_0,
+                .SDA_Port = GPIOC,
+                .SDA_Pin  = GPIO_PIN_5,
                 .Interval = 6,
         };
 
 
-        at24cxx.bus = &swi2c3_bus,
-        at24cxx.drv = &swi2c_drv,
-        at24cxx.dev = AT24CXX_DEV,
-        at24cxx.ops = I2C_DEV_7BIT | I2C_REG_8BIT,
+        m24c02.bus = &swi2c3_bus,
+        m24c02.drv = &swi2c_drv,
+        m24c02.dev = AT24CXX_DEV,
+        m24c02.ops = I2C_DEV_7BIT | I2C_REG_8BIT,
 
         swi2c_drv.init(&swi2c3_bus);
         
-        i2cdrv_detector(&swi2c3_bus, at24cxx.drv);
-
-}
-
-
-void i2c_eeprom_test(struct i2c_cli at24cxx){
-        int i = 0;
-        object_t obj;
-
-
-        i2c_eeprom_init(at24cxx);
-
-
+        i2cdrv_detector(&swi2c3_bus, m24c02.drv);
 
         obj.i[0] = 0;
         obj.i[1] = 0;
         obj.f    = 0;
 
-        at24cxx_read_variable(at24cxx , 0x00 , obj);
+        at24cxx_read_variable(m24c02 , 0x00 , obj);
 
 
         println("i[0]=%d,i[1]=%d,f=%f", obj.i[0], obj.i[1], obj.f);
@@ -124,12 +117,12 @@ void i2c_eeprom_test(struct i2c_cli at24cxx){
         obj.f    = 6.289;
         i = 6;
 
-        at24cxx_write_variable(at24cxx,0x00, obj);
+        at24cxx_write_variable(m24c02,0x00, obj);
         obj.i[0] = 0;  
         obj.i[1] = 0;
         obj.f    = 0;
         i = 0;
-        at24cxx_read_variable(at24cxx,0x00, obj);
+        at24cxx_read_variable(m24c02,0x00, obj);
 
 
         println("i[0]=%d,i[1]=%d,f=%f", obj.i[0], obj.i[1], obj.f);

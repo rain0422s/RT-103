@@ -49,8 +49,6 @@
 /* USER CODE BEGIN PTD */
 uint16_t adc_value[100];
 SHT3xObjectType sht;
-struct i2c_cli m24c02;
-stmdev_ctx_t dev_ctx;
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -336,7 +334,8 @@ void ui_task(void* arg)
 }
 #endif
 void gesture_task(void* arg){
-
+        lfs_first_run(); 
+        i2c_eeprom_test();
         ButtonState buttonState = IDLE_STATE;
         while(1){
                 switch(button_scan(false,&buttonState)){
@@ -365,11 +364,12 @@ void sensor_task(void* arg)
 { 
         // enable_fifo(&dev_ctx);
  
-        lfs_first_run(); 
+        
 
         while(1){
                 // get_sensor_value(sht,adc_value);
-                lis2dh12_read_data(&dev_ctx);
+                // lis2dh12_read_data(&dev_ctx);
+                lis2dh12_init();
                 // printf("I am alive\n");
                 // HAL_GPIO_ReadPin(GPIOB ,GPIO_PIN_0) ;//INT1
                 // read_fifo(&dev_ctx);
@@ -457,7 +457,6 @@ int main(void)
 //   HAL_TIM_PWM_Start(&htim3,TIM_CHANNEL_4);
         PowerOn;
         // sensor_init(sht,adc_value,hadc1);
-        // i2c_eeprom_test(m24c02);
         // ui_test(u8g2);
   /* USER CODE END 2 */
 
@@ -465,7 +464,7 @@ int main(void)
   /* USER CODE BEGIN WHILE */
         xTaskCreate((TaskFunction_t)Creator,
                 (const char *)"Creator",               
-                (uint16_t)1024,                           
+                (uint16_t)128,                           
                 (void *)NULL,                          
                 (UBaseType_t)10,                         
                 (TaskHandle_t *)&V_handle_task_Creator);
@@ -540,24 +539,23 @@ static void Creator(void){
          * @description: 任务创建区
          */
         uart_dma_init();   
-        lis2dh12_init(&dev_ctx);
         xTaskCreate((TaskFunction_t)sensor_task,             /* 任务入口函数 */
                                         (const char *)"sensor_task",             /* 任务名字 */
-                                        (uint16_t)512,                               /* 任务栈大小 */
+                                        (uint16_t)256,                               /* 任务栈大小 */
                                         (void *)NULL,                                /* 任务入口函数参数 */
                                         (UBaseType_t)3,                             /* 任务的优先级 */
                                         (TaskHandle_t *)&V_handle_task_DeviceStart); /* 任务控制块指针 */
                 
         xTaskCreate((TaskFunction_t)gesture_task,           
                                         (const char *)"gesture_task",          
-                                        (uint16_t)128,                        
+                                        (uint16_t)1024,                        
                                         (void *)NULL,                   
                                         (UBaseType_t)10,                        
                                         (TaskHandle_t *)&V_handle_task_IdleLED);
 
 	xTaskCreate((TaskFunction_t )eventTask2,
                                         (const char *)"eventTask2",
-                                        (uint16_t)128,
+                                        (uint16_t)64,
                                         (void*) NULL,
                                         2,
                                         &xHandleTsak);

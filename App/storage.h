@@ -10,5 +10,5 @@ typedef struct {
 } object_t;
 
 void spi_flash_test();
-void i2c_eeprom_test(struct i2c_cli at24cxx);
+void i2c_eeprom_test();
 #endif
