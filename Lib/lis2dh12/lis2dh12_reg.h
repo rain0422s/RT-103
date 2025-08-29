@@ -241,7 +241,7 @@ typedef struct
 #define LIS2DH12_I2C_ADD_H   0x33U
 
 /** Device Identification (Who am I) **/
-#define LIS2DH12_ID          0x33U
+#define LIS2DH12_ID          0x41U
 
 /**
   * @}
