@@ -1,7 +1,7 @@
 #ifndef __CRC8_H
 #define __CRC8_H
 
-#include "Stddef.h"
+#include "stddef.h"
 #include "stdio.h"
 #include "stdint.h"
 
