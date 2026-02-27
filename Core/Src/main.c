@@ -352,24 +352,28 @@ static void storage_init_task(void *arg)
         vTaskDelete(NULL);
 }
 
-void gesture_task(void* arg){
+void gesture_task(void* arg)
+{
         ButtonState buttonState = IDLE_STATE;
-        while(1){
-                switch(button_scan(false,&buttonState)){
+
+        for (;;) {
+                ButtonState evt = button_scan(false, &buttonState);
+
+                switch (evt) {
                         case SHORT_PRESS_STATE:
-                                BLUE_LED(1);
-                                // RED_LED(0);
+                                printf("[key] short press\n");
                                 break;
                         case LONG_PRESS_STATE:
-                                BLUE_LED(0);
-                                breathing_led_set(false);  /* 关闭呼吸灯 */
+                                printf("[key] long press\n");
                                 break;
                         case DOUBLE_PRESS_STATE:
-                                BLUE_LED(0);
-                                breathing_led_set(true);   /* 开启呼吸灯 */
+                                printf("[key] double press\n");
+                                break;
+                        default:
                                 break;
                 }
-                delay_ms(10);
+
+                vTaskDelay(pdMS_TO_TICKS(10));
         }
 }
 #define lis2dh12_INT1_GPIO_Port   GPIOA
