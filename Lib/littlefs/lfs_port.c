@@ -119,80 +119,78 @@ int bytes_to_mb(uint32_t bytes) {
         return 0;
 }
 
+/* 全局挂载：一直挂载，关机时再卸载 */
+static lfs_t s_lfs;
+static int s_mounted = 0;
 
-int lfs_first_run(void){
-        lfs_t lfs;
-        lfs_file_t file;
-        // w25qxx_erase_chip();
-        // mount the filesystem
-        int err = lfs_mount(&lfs, &lfs_w25qxx_cfg);
-
-        // reformat if we can't mount the filesystem
-        // this should only happen on the first boot
+int lfs_mount_fs(void)
+{
+        if (s_mounted)
+                return 0;
+        int err = lfs_mount(&s_lfs, &lfs_w25qxx_cfg);
         if (err) {
-                lfs_format(&lfs, &lfs_w25qxx_cfg);
-                lfs_mount(&lfs, &lfs_w25qxx_cfg);
+                lfs_format(&s_lfs, &lfs_w25qxx_cfg);
+                err = lfs_mount(&s_lfs, &lfs_w25qxx_cfg);
         }
+        if (err == 0)
+                s_mounted = 1;
+        return err;
+}
 
-        // 检查剩余空间
+int lfs_unmount_fs(void)
+{
+        if (!s_mounted)
+                return 0;
+        int err = lfs_unmount(&s_lfs);
+        if (err == 0)
+                s_mounted = 0;
+        return err;
+}
+
+lfs_t *lfs_get(void)
+{
+        return s_mounted ? &s_lfs : NULL;
+}
+
+int lfs_first_run(void)
+{
+        lfs_file_t file;
+        int err = lfs_mount_fs();
+        if (err)
+                return err;
+
+        /* 检查剩余空间 */
         int total_blocks = lfs_w25qxx_cfg.block_count;
-        int used_blocks = lfs_fs_size(&lfs);
+        int used_blocks = lfs_fs_size(&s_lfs);
         int free_blocks = total_blocks - used_blocks;
-        printf("Free space: %d blocks (%d bytes)\n", 
-        free_blocks, free_blocks * lfs_w25qxx_cfg.block_size);
+        printf("Free space: %d blocks (%d bytes)\n",
+               free_blocks, free_blocks * lfs_w25qxx_cfg.block_size);
         bytes_to_mb(free_blocks * lfs_w25qxx_cfg.block_size);
 
-
-        // // 写入文件
-        // lfs_file_t file;
-        // lfs_file_open(&lfs, &file, "test.txt", LFS_O_WRONLY | LFS_O_CREAT);
-        // lfs_file_write(&lfs, &file, "Hello World", 11);
-        // lfs_file_close(&lfs, &file);
-
-        // // 读取文件
-        // lfs_file_open(&lfs, &file, "test.txt", LFS_O_RDONLY);
-        // char buffer[64];
-        // lfs_file_read(&lfs, &file, buffer, sizeof(buffer));
-        // lfs_file_close(&lfs, &file);
-        // printf("test.txt: %s\n", buffer);
-
-        // // 删除文件
-        // err = lfs_remove(&lfs, "test.txt");
-        // if (err) {
-        //         printf("remove test.txt fail\n");
-        // }
-
-        // read current count
+        /* boot_count */
         uint32_t boot_count = 0;
-        lfs_file_open(&lfs, &file, "boot_count", LFS_O_RDWR | LFS_O_CREAT);
-        lfs_file_read(&lfs, &file, &boot_count, sizeof(boot_count));
-
-        // update boot count
+        lfs_file_open(&s_lfs, &file, "boot_count", LFS_O_RDWR | LFS_O_CREAT);
+        lfs_file_read(&s_lfs, &file, &boot_count, sizeof(boot_count));
         boot_count += 1;
-        lfs_file_rewind(&lfs, &file);
-        lfs_file_write(&lfs, &file, &boot_count, sizeof(boot_count));
+        lfs_file_rewind(&s_lfs, &file);
+        lfs_file_write(&s_lfs, &file, &boot_count, sizeof(boot_count));
+        lfs_file_close(&s_lfs, &file);
+        printf("boot_count: %d\n", (int)boot_count);
 
-        // remember the storage is not updated until the file is closed successfully
-        lfs_file_close(&lfs, &file);
-
-        // print the boot count
-        printf("boot_count: %d\n", boot_count);
-
-
+        /* 列目录 */
         lfs_dir_t dir;
         struct lfs_info info;
-
-        lfs_dir_open(&lfs, &dir, "/");
-        while (lfs_dir_read(&lfs, &dir, &info)) {
-        printf("%s (%s, size: %d)\n", 
-                info.name,
-                info.type == LFS_TYPE_REG ? "file" : "dir",
-                info.size);
+        lfs_dir_open(&s_lfs, &dir, "/");
+        while (lfs_dir_read(&s_lfs, &dir, &info)) {
+                printf("%s (%s, size: %d)\n",
+                       info.name,
+                       info.type == LFS_TYPE_REG ? "file" : "dir",
+                       info.size);
         }
-        lfs_dir_close(&lfs, &dir);
+        lfs_dir_close(&s_lfs, &dir);
 
-        // release any resources we were using
-        lfs_unmount(&lfs);
+        /* 不卸载，保持挂载 */
+        return 0;
 }
 
 

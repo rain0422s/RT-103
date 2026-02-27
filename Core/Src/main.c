@@ -79,7 +79,11 @@ SHT3xObjectType sht;
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-uint16_t pwmVal=0;    
+uint16_t pwmVal = 0;
+static volatile bool breathing_led_enabled = false;  /* 呼吸灯使能（volatile 保证多任务间可见） */
+
+void breathing_led_set(bool on);  /* 前向声明 */
+
 static void Creator(void); /* 用于创建和初始化FreeRTOS中的所有任务、事件和信号量 */
 static TaskHandle_t V_handle_task_Creator = NULL;
 TaskHandle_t V_handle_task_DeviceStart = NULL;
@@ -87,7 +91,7 @@ TaskHandle_t V_handle_task_IdleLED = NULL;
 TaskHandle_t xHandleTsak = NULL;
 TaskHandle_t xHandleTsak1 = NULL;
 TimerHandle_t xLedTimer;
-#define EVENT7 (0x01 << 6)
+#define POWER_KEY_EVENT  (0x01 << 6)
 bool time_flag=false;
 EventGroupHandle_t myxEventGroupHandle_t = NULL;
 
@@ -252,60 +256,65 @@ void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
 
 
 
-void eventTask2(void){
-        // static portTickType myPreviousWakeTime;
+/**
+ * @brief Power key task: power key long press 2s -> KEY1 long press as confirm -> power down
+ */
+static void power_key_task(void *arg)
+{
         ButtonState buttonState = IDLE_STATE;
-        // 设置变量接收事件
         EventBits_t r_event;
-	for (;;){
-		r_event = xEventGroupWaitBits(myxEventGroupHandle_t,EVENT7,
-						pdTRUE,pdFALSE,portMAX_DELAY);
-		if((r_event&EVENT7) != 0){
-                        printf("I do it eventTask2\n"); 
-                        time_flag=false;
+        (void)arg;
 
-                        if (xTimerReset(xLedTimer, 0) != pdPASS) {
-                                printf("Timer reset failed\n");
-                                return;
-                        }
+        if (!myxEventGroupHandle_t) {
+                printf("[power] event group is NULL, task exit\n");
+                vTaskDelete(NULL);
+                return;
+        }
+        printf("[power] task started, waiting for POWER_KEY_EVENT\n");
+        for (;;) {
+                r_event = xEventGroupWaitBits(myxEventGroupHandle_t, POWER_KEY_EVENT,
+                                             pdTRUE, pdFALSE, portMAX_DELAY);
+                if ((r_event & POWER_KEY_EVENT) == 0)
+                        continue;
 
-                        while(!HAL_GPIO_ReadPin(POWERKEY_GPIO_PORT ,POWERKEY_GPIO_PIN) && !time_flag){
-                                delay_ms(1);
-                        }
+                time_flag = false;
+                if (xTimerReset(xLedTimer, 0) != pdPASS) {
+                        printf("[power] Timer reset failed\n");
+                        continue;
+                }
 
-                        if (xTimerStop(xLedTimer, 0) != pdPASS) {
-                                printf("Timer stop failed\n");
-                                return;
-                        }
-                        printf("I will die\n");
-                        if(time_flag && button_scan(true,&buttonState) == LONG_PRESS_STATE){
-                                printf("I am die2\n");   
+                while (!HAL_GPIO_ReadPin(POWERKEY_GPIO_PORT, POWERKEY_GPIO_PIN) && !time_flag)
+                        vTaskDelay(pdMS_TO_TICKS(10));
+
+                if (xTimerStop(xLedTimer, 0) != pdPASS) {
+                        printf("[power] Timer stop failed\n");
+                        continue;
+                }
+
+                if (time_flag) {
+                        buttonState = IDLE_STATE;
+                        if (button_scan(true, &buttonState) == LONG_PRESS_STATE) {
+                                printf("[power] Power down\n");
+                                lfs_unmount_fs();
                                 PowerDown;
                         }
-
-                        printf("I am alive\n");
                 }
         }
 }
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
-	BaseType_t pxHigherPriorityTaskWoken; 
-	uint32_t ulReturn;
-	uint16_t event;
-	ulReturn = taskENTER_CRITICAL_FROM_ISR();
-	GPIO_PinState pinState = HAL_GPIO_ReadPin( POWERKEY_GPIO_PORT , GPIO_Pin );
-	if(pinState == GPIO_PIN_RESET ){
-		// 判断中断位置 
-		if(GPIO_Pin == POWERKEY_GPIO_PIN ){
-			event = EVENT7;
-		}
-		xEventGroupSetBitsFromISR(myxEventGroupHandle_t,event,
-                        &pxHigherPriorityTaskWoken);
-                // 如果有更高优先级的任务被唤醒，则进行任务切换
-		portYIELD_FROM_ISR(pxHigherPriorityTaskWoken);
-	}
-	taskEXIT_CRITICAL_FROM_ISR( ulReturn ); 	
+        BaseType_t pxHigherPriorityTaskWoken = pdFALSE;
+        uint32_t ulReturn;
+        uint16_t event = 0;
+        ulReturn = taskENTER_CRITICAL_FROM_ISR();
+        if (GPIO_Pin == POWERKEY_GPIO_PIN &&
+            HAL_GPIO_ReadPin(POWERKEY_GPIO_PORT, GPIO_Pin) == GPIO_PIN_RESET) {
+                event = POWER_KEY_EVENT;
+                xEventGroupSetBitsFromISR(myxEventGroupHandle_t, event, &pxHigherPriorityTaskWoken);
+                portYIELD_FROM_ISR(pxHigherPriorityTaskWoken);
+        }
+        taskEXIT_CRITICAL_FROM_ISR(ulReturn);
 }
 
 void vTimerCallback(TimerHandle_t xTimer) {
@@ -333,23 +342,31 @@ void ui_task(void* arg)
     }
 }
 #endif
-void gesture_task(void* arg){
-        lfs_first_run(); 
+/** 开机后延时 30 秒再执行 LittleFS 与 EEPROM 初始化，执行完自删 */
+static void storage_init_task(void *arg)
+{
+        (void)arg;
+        vTaskDelay(pdMS_TO_TICKS(30000));  /* 延时 30 秒 */
+        lfs_first_run();
         i2c_eeprom_test();
+        vTaskDelete(NULL);
+}
+
+void gesture_task(void* arg){
         ButtonState buttonState = IDLE_STATE;
         while(1){
                 switch(button_scan(false,&buttonState)){
                         case SHORT_PRESS_STATE:
                                 BLUE_LED(1);
-                                RED_LED(0);
+                                // RED_LED(0);
                                 break;
                         case LONG_PRESS_STATE:
                                 BLUE_LED(0);
-                                RED_LED(0);
+                                breathing_led_set(false);  /* 关闭呼吸灯 */
                                 break;
                         case DOUBLE_PRESS_STATE:
                                 BLUE_LED(0);
-                                RED_LED(1);
+                                breathing_led_set(true);   /* 开启呼吸灯 */
                                 break;
                 }
                 delay_ms(10);
@@ -360,49 +377,52 @@ void gesture_task(void* arg){
 #define lis2dh12_INT2_GPIO_Port   GPIOA
 #define lis2dh12_INT2_Pin         GPIO_PIN_12
 
+/** 呼吸灯：一次从暗到亮再到暗（循环内检查使能，关闭时可立即退出） */
+static void breathing_led_once(void)
+{
+        while (pwmVal < 500 && breathing_led_enabled)
+        {
+                pwmVal++;
+                __HAL_TIM_SetCompare(&htim2, TIM_CHANNEL_1, pwmVal);
+                delay_ms(1);
+        }
+        if (!breathing_led_enabled)
+                return;
+        while (pwmVal && breathing_led_enabled)
+        {
+                pwmVal--;
+                __HAL_TIM_SetCompare(&htim2, TIM_CHANNEL_1, pwmVal);
+                delay_ms(1);
+        }
+}
+
+/**
+ * @brief 呼吸灯开关
+ * @param on true=打开呼吸灯（循环执行 breathing_led_once），false=关闭呼吸灯（灭灯）
+ */
+void breathing_led_set(bool on)
+{
+        breathing_led_enabled = on;
+        if (!on)
+        {
+                pwmVal = 0;
+                __HAL_TIM_SetCompare(&htim2, TIM_CHANNEL_1, 799);  /* 灭灯（按你硬件可改为 0） */
+        }
+}
+
 void sensor_task(void* arg)
 { 
         // enable_fifo(&dev_ctx);
  
-        
+        // lis2dh12_init();       
 
-        while(1){
-                // get_sensor_value(sht,adc_value);
-                // lis2dh12_read_data(&dev_ctx);
-                lis2dh12_init();
-                // printf("I am alive\n");
-                // HAL_GPIO_ReadPin(GPIOB ,GPIO_PIN_0) ;//INT1
-                // read_fifo(&dev_ctx);
-                //check INT2
-                // if(!HAL_GPIO_ReadPin(lis2dh12_INT2_GPIO_Port ,lis2dh12_INT2_Pin)){
-                //         printf("I sleep\n");
-                //         // BLUE_LED(0);
-                // }else{
-                //         printf("I am ailve\n");
-                //         // BLUE_LED(1);
-                // }
-                //check INT1
-                // if(!HAL_GPIO_ReadPin(lis2dh12_INT2_GPIO_Port ,lis2dh12_INT1_Pin)){
-                //         printf("I get it\n");
-                //         clear_init1(&dev_ctx);
-                // }else{
-                //         printf("I no get \n");
-                // }
+        while (1)
+        {
+                if (breathing_led_enabled)
+                {
+                        breathing_led_once();
+                }
                 delay_ms(2000);
-                //   while (pwmVal< 500)
-                //   {
-                // 	  pwmVal++;
-                // 	  __HAL_TIM_SetCompare(&htim3, TIM_CHANNEL_4, pwmVal);    
-                // 	//   TIM3->CCR1 = pwmVal;  
-                //           delay_ms(1);
-                //   }
-                //   while (pwmVal)
-                //   {
-                // 	  pwmVal--;
-                // 	  __HAL_TIM_SetCompare(&htim3, TIM_CHANNEL_4, pwmVal); 
-                // 	//   TIM3->CCR1 = pwmVal;    
-                //           delay_ms(1);
-                //   }
         }
 }
 void dly_ms(uint32_t ms)
@@ -453,8 +473,9 @@ int main(void)
   MX_USART1_UART_Init();
   MX_USART2_UART_Init();
   MX_TIM3_Init();
+  MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
-//   HAL_TIM_PWM_Start(&htim3,TIM_CHANNEL_4);
+  HAL_TIM_PWM_Start(&htim2,TIM_CHANNEL_1);
         PowerOn;
         // sensor_init(sht,adc_value,hadc1);
         // ui_test(u8g2);
@@ -539,43 +560,43 @@ static void Creator(void){
          * @description: 任务创建区
          */
         uart_dma_init();   
-        xTaskCreate((TaskFunction_t)sensor_task,             /* 任务入口函数 */
-                                        (const char *)"sensor_task",             /* 任务名字 */
-                                        (uint16_t)256,                               /* 任务栈大小 */
-                                        (void *)NULL,                                /* 任务入口函数参数 */
-                                        (UBaseType_t)3,                             /* 任务的优先级 */
-                                        (TaskHandle_t *)&V_handle_task_DeviceStart); /* 任务控制块指针 */
-                
-        xTaskCreate((TaskFunction_t)gesture_task,           
-                                        (const char *)"gesture_task",          
-                                        (uint16_t)768,                        
-                                        (void *)NULL,                   
-                                        (UBaseType_t)10,                        
+        /* 栈单位：字(4B)。STM32F103 48KB RAM，总任务栈宜控制在约 6KB 内，与 8KB 堆协调 */
+        xTaskCreate((TaskFunction_t)sensor_task,
+                                        (const char *)"sensor_task",
+                                        (uint16_t)256,           /* 1KB：呼吸灯循环 */
+                                        (void *)NULL,
+                                        (UBaseType_t)3,
+                                        (TaskHandle_t *)&V_handle_task_DeviceStart);
+
+        xTaskCreate((TaskFunction_t)gesture_task,
+                                        (const char *)"gesture_task",
+                                        (uint16_t)384,           /* 1.5KB：按键扫描 + LED + switch */
+                                        (void *)NULL,
+                                        (UBaseType_t)10,
                                         (TaskHandle_t *)&V_handle_task_IdleLED);
 
-	xTaskCreate((TaskFunction_t )eventTask2,
-                                        (const char *)"eventTask2",
-                                        (uint16_t)64,
-                                        (void*) NULL,
+        /* 事件组、定时器必须在 power_key_task 之前创建 */
+        myxEventGroupHandle_t = xEventGroupCreate();
+        if (!myxEventGroupHandle_t)
+                printf("[Creator] xEventGroupCreate failed\n");
+        xLedTimer = xTimerCreate("MyTimer", pdMS_TO_TICKS(2000), pdFALSE, (void *)0, vTimerCallback);
+
+        /* 优先级 6：30s 后 lfs_first_run + i2c_eeprom_test，然后自删 */
+        xTaskCreate((TaskFunction_t)storage_init_task,
+                                        (const char *)"storage_init",
+                                        (uint16_t)512,
+                                        (void *)NULL,
+                                        (UBaseType_t)6,
+                                        NULL);
+
+        BaseType_t ret = xTaskCreate((TaskFunction_t)power_key_task,
+                                        (const char *)"power_key",
+                                        (uint16_t)128,
+                                        (void *)NULL,
                                         2,
                                         &xHandleTsak);
-
-
-
-	// 创建事件
-	myxEventGroupHandle_t = xEventGroupCreate();
-	if(!myxEventGroupHandle_t)
-		printf("event fail\n");
-	else
-		printf("event suc\n");
-
-        xLedTimer = xTimerCreate(
-                        "MyTimer",          // 定时器名称
-                        pdMS_TO_TICKS(2000), // 定时器周期（1000毫秒）
-                        pdFALSE,          
-                        (void *)0,          // 定时器ID
-                        vTimerCallback      // 回调函数
-                );
+        if (ret != pdPASS)
+                printf("[Creator] power_key_task create failed (heap?)\n");
 
   /***********************************任务创建区***********************************/
   vTaskDelete(V_handle_task_Creator); // 删除Creator任务
