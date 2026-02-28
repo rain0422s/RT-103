@@ -58,17 +58,22 @@ SHT3xObjectType sht;
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
-#define RED_LED(x) do{ x? \
-	                     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15, GPIO_PIN_RESET): \
-	                     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15, GPIO_PIN_SET); \
-                 } while(0)
-
-
 #define BLUE_LED(x) do{ x? \
 	                     HAL_GPIO_WritePin(GPIOC, GPIO_PIN_10, GPIO_PIN_RESET): \
 	                     HAL_GPIO_WritePin(GPIOC, GPIO_PIN_10, GPIO_PIN_SET); \
                  } while(0)
 
+/** Blink BLUE_LED: times × (on_ms on, off_ms off). Uses delay_ms (blocking). */
+static void led_blink(uint8_t times, uint32_t on_ms, uint32_t off_ms)
+{
+        for (uint8_t i = 0; i < times; i++) {
+                BLUE_LED(1);
+                delay_ms(on_ms);
+                BLUE_LED(0);
+                if (off_ms > 0 && i < times - 1)
+                        delay_ms(off_ms);
+        }
+}
 
 #define PowerOn         HAL_GPIO_WritePin(GPIOB, GPIO_PIN_10, GPIO_PIN_SET);
 #define PowerDown       HAL_GPIO_WritePin(GPIOB, GPIO_PIN_10, GPIO_PIN_RESET);
@@ -556,55 +561,52 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
-static void Creator(void){
+/**
+ * @brief Create all RTOS tasks, event group and timer; blink LED on success then delete self.
+ */
+static void Creator(void)
+{
+        taskENTER_CRITICAL();
 
-        taskENTER_CRITICAL(); // 进入临界区
+        uart_dma_init();
 
-        /**
-         * @description: 任务创建区
-         */
-        uart_dma_init();   
-        /* 栈单位：字(4B)。STM32F103 48KB RAM，总任务栈宜控制在约 6KB 内，与 8KB 堆协调 */
-        xTaskCreate((TaskFunction_t)sensor_task,
-                                        (const char *)"sensor_task",
-                                        (uint16_t)256,           /* 1KB：呼吸灯循环 */
-                                        (void *)NULL,
-                                        (UBaseType_t)3,
-                                        (TaskHandle_t *)&V_handle_task_DeviceStart);
+        BaseType_t ok = pdPASS;
+        if (xTaskCreate((TaskFunction_t)sensor_task, "sensor_task", 256, NULL, 3,
+                        (TaskHandle_t *)&V_handle_task_DeviceStart) != pdPASS) {
+                printf("[Creator] sensor_task create failed\n");
+                ok = pdFALSE;
+        }
+        if (xTaskCreate((TaskFunction_t)gesture_task, "gesture_task", 384, NULL, 10,
+                        (TaskHandle_t *)&V_handle_task_IdleLED) != pdPASS) {
+                printf("[Creator] gesture_task create failed\n");
+                ok = pdFALSE;
+        }
 
-        xTaskCreate((TaskFunction_t)gesture_task,
-                                        (const char *)"gesture_task",
-                                        (uint16_t)384,           /* 1.5KB：按键扫描 + LED + switch */
-                                        (void *)NULL,
-                                        (UBaseType_t)10,
-                                        (TaskHandle_t *)&V_handle_task_IdleLED);
-
-        /* 事件组、定时器必须在 power_key_task 之前创建 */
         myxEventGroupHandle_t = xEventGroupCreate();
-        if (!myxEventGroupHandle_t)
+        if (!myxEventGroupHandle_t) {
                 printf("[Creator] xEventGroupCreate failed\n");
-        xLedTimer = xTimerCreate("MyTimer", pdMS_TO_TICKS(2000), pdFALSE, (void *)0, vTimerCallback);
+                ok = pdFALSE;
+        }
+        xLedTimer = xTimerCreate("PowerKey2s", pdMS_TO_TICKS(2000), pdFALSE, (void *)0, vTimerCallback);
+        if (!xLedTimer) {
+                printf("[Creator] xTimerCreate failed\n");
+                ok = pdFALSE;
+        }
 
-        /* 优先级 6：30s 后 lfs_first_run + i2c_eeprom_test，然后自删 */
-        xTaskCreate((TaskFunction_t)storage_init_task,
-                                        (const char *)"storage_init",
-                                        (uint16_t)512,
-                                        (void *)NULL,
-                                        (UBaseType_t)6,
-                                        NULL);
+        if (xTaskCreate((TaskFunction_t)storage_init_task, "storage_init", 512, NULL, 6, NULL) != pdPASS) {
+                printf("[Creator] storage_init_task create failed\n");
+                ok = pdFALSE;
+        }
+        if (xTaskCreate((TaskFunction_t)power_key_task, "power_key", 128, NULL, 2, &xHandleTsak) != pdPASS) {
+                printf("[Creator] power_key_task create failed\n");
+                ok = pdFALSE;
+        }
 
-        BaseType_t ret = xTaskCreate((TaskFunction_t)power_key_task,
-                                        (const char *)"power_key",
-                                        (uint16_t)128,
-                                        (void *)NULL,
-                                        2,
-                                        &xHandleTsak);
-        if (ret != pdPASS)
-                printf("[Creator] power_key_task create failed (heap?)\n");
+        taskEXIT_CRITICAL();  /* 必须先退出临界区再调用 led_blink，否则 delay_ms(vTaskDelay) 无法切换任务会卡死 */
+        if (ok == pdPASS)
+                led_blink(3, 200, 150);  /* 3 次，亮 200ms / 灭 150ms，更明显 */
 
-  /***********************************任务创建区***********************************/
-  vTaskDelete(V_handle_task_Creator); // 删除Creator任务
-  taskEXIT_CRITICAL();                // 退出临界区
+        vTaskDelete(V_handle_task_Creator);
 }
 /* USER CODE END 4 */
 
