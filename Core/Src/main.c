@@ -100,6 +100,13 @@ TimerHandle_t xLedTimer;
 bool time_flag=false;
 EventGroupHandle_t myxEventGroupHandle_t = NULL;
 
+/* 灯光控制任务：1=蓝灯闪4s 2=关蓝灯 3=开蓝灯 4=开呼吸灯 5=关呼吸灯 6=就绪(呼吸+闪4s) 7=全关 */
+enum { LED_CMD_BLINK_4S = 1, LED_CMD_OFF, LED_CMD_ON, LED_CMD_BREATH_ON, LED_CMD_BREATH_OFF, LED_CMD_READY, LED_CMD_ALL_OFF };
+#define LED_CTL_QUEUE_LEN  4
+QueueHandle_t led_ctl_queue = NULL;
+
+void led_control_send(uint8_t cmd);  /* 发送命令到灯光任务 */
+
 
 
 
@@ -299,8 +306,9 @@ static void power_key_task(void *arg)
                 if (time_flag) {
                         buttonState = IDLE_STATE;
                         if (button_scan(true, &buttonState) == LONG_PRESS_STATE) {
-                                printf("[power] Power down\n");
+                                led_control_send(LED_CMD_ALL_OFF);
                                 lfs_unmount_fs();
+                                led_blink(20, 100, 100);  /* 阻塞约 4s，闪烁完成后再关机 */
                                 PowerDown;
                         }
                 }
@@ -389,7 +397,7 @@ void gesture_task(void* arg)
 /** 呼吸灯：一次从暗到亮再到暗（循环内检查使能，关闭时可立即退出） */
 static void breathing_led_once(void)
 {
-        while (pwmVal < 500 && breathing_led_enabled)
+        while (pwmVal < 1000 && breathing_led_enabled)
         {
                 pwmVal++;
                 __HAL_TIM_SetCompare(&htim2, TIM_CHANNEL_1, pwmVal);
@@ -415,7 +423,53 @@ void breathing_led_set(bool on)
         if (!on)
         {
                 pwmVal = 0;
-                __HAL_TIM_SetCompare(&htim2, TIM_CHANNEL_1, 799);  /* 灭灯（按你硬件可改为 0） */
+                __HAL_TIM_SetCompare(&htim2, TIM_CHANNEL_1, 999);
+        }
+}
+
+void led_control_send(uint8_t cmd)
+{
+        if (led_ctl_queue)
+                xQueueSend(led_ctl_queue, &cmd, 0);
+}
+
+/** 灯光控制任务：栈 96 字，接收 1/2/3/4/5 执行对应灯控 */
+static void led_control_task(void *arg)
+{
+        uint8_t cmd;
+        (void)arg;
+
+        for (;;) {
+                if (xQueueReceive(led_ctl_queue, &cmd, portMAX_DELAY) != pdPASS)
+                        continue;
+
+                switch (cmd) {
+                case LED_CMD_BLINK_4S:
+                        led_blink(20, 100, 100);  /* 4s ≈ 20×(100+100)ms */
+                        break;
+                case LED_CMD_OFF:
+                        BLUE_LED(0);
+                        break;
+                case LED_CMD_ON:
+                        BLUE_LED(1);
+                        break;
+                case LED_CMD_BREATH_ON:
+                        breathing_led_set(true);
+                        break;
+                case LED_CMD_BREATH_OFF:
+                        breathing_led_set(false);
+                        break;
+                case LED_CMD_READY:
+                        breathing_led_set(true);
+                        led_blink(20, 100, 100);
+                        break;
+                case LED_CMD_ALL_OFF:
+                        breathing_led_set(false);
+                        BLUE_LED(0);
+                        break;
+                default:
+                        break;
+                }
         }
 }
 
@@ -602,9 +656,15 @@ static void Creator(void)
                 ok = pdFALSE;
         }
 
-        taskEXIT_CRITICAL();  /* 必须先退出临界区再调用 led_blink，否则 delay_ms(vTaskDelay) 无法切换任务会卡死 */
+        led_ctl_queue = xQueueCreate(LED_CTL_QUEUE_LEN, sizeof(uint8_t));
+        if (!led_ctl_queue)
+                ok = pdFALSE;
+        else if (xTaskCreate((TaskFunction_t)led_control_task, "led_ctl", 96, NULL, 2, NULL) != pdPASS)
+                ok = pdFALSE;
+
+        taskEXIT_CRITICAL();
         if (ok == pdPASS)
-                led_blink(3, 200, 150);  /* 3 次，亮 200ms / 灭 150ms，更明显 */
+                led_control_send(LED_CMD_READY);
 
         vTaskDelete(V_handle_task_Creator);
 }
