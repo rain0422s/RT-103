@@ -1,6 +1,5 @@
 #ifndef __UTILS_H__
 #define __UTILS_H__
-// #define U8G2_ENABLED
 ///////////////////////////////////////////////// delay
 
 #include "stm32f1xx_hal.h"

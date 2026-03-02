@@ -1,8 +1,15 @@
 #ifndef __DISPLAY_H
 #define __DISPLAY_H
 #include "utils.h"
+
+/* U8G2_ENABLED 未定义时：LVGL */
+#ifndef U8G2_ENABLED
 #include "lv_init.h"
 #include "lv_port_disp.h"
+void demo_run(void);
+#endif
+
+/* U8G2_ENABLED 为 1 时：U8G2，不走 LVGL */
 #ifdef U8G2_ENABLED
 #include "oled.h"
 static const unsigned char u8g_logo_bits[] U8X8_PROGMEM =
@@ -13,7 +20,8 @@ static const unsigned char u8g_logo_bits[] U8X8_PROGMEM =
 	0x00,0x00,0x00,0x00,
 };
 
-void ui_test(u8g2_t u8g2);
-void loop1(u8g2_t u8g2);
-#endif
+void ui_test(u8g2_t *u8g2);
+void ui_task(void *arg);
+
+#endif /* U8G2_ENABLED */
 #endif

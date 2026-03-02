@@ -344,17 +344,6 @@ void SystemClock_Config(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-#ifdef U8G2_ENABLED
-u8g2_t u8g2;
-void ui_task(void* arg)
-{
-    while(1)
-    {
-        loop1(u8g2);
-        delay_ms(500);
-    }
-}
-#endif
 /** 开机后延时 30 秒再执行 LittleFS 与 EEPROM 初始化，执行完自删 */
 static void storage_init_task(void *arg)
 {
@@ -540,24 +529,18 @@ int main(void)
   /* USER CODE BEGIN 2 */
   HAL_TIM_PWM_Start(&htim2,TIM_CHANNEL_1);
         PowerOn;
-        // sensor_init(sht,adc_value,hadc1);
-        // ui_test(u8g2);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
         xTaskCreate((TaskFunction_t)Creator,
-                (const char *)"Creator",               
-                (uint16_t)128,                           
-                (void *)NULL,                          
-                (UBaseType_t)10,                         
+                (const char *)"Creator",
+                (uint16_t)128,
+                (void *)NULL,
+                (UBaseType_t)10,
                 (TaskHandle_t *)&V_handle_task_Creator);
-        // xTaskCreate(ui_task, "ui_task", 128, NULL, 5, NULL);
 
-
-
-        // 启动任务调度
-       vTaskStartScheduler();
+        vTaskStartScheduler();
 
   while (1){
     /* USER CODE END WHILE */
@@ -661,6 +644,13 @@ static void Creator(void)
                 ok = pdFALSE;
         else if (xTaskCreate((TaskFunction_t)led_control_task, "led_ctl", 96, NULL, 2, NULL) != pdPASS)
                 ok = pdFALSE;
+
+#ifdef U8G2_ENABLED
+        if (xTaskCreate((TaskFunction_t)ui_task, "ui_task", 128, NULL, 5, NULL) != pdPASS) {
+                printf("[Creator] ui_task create failed\n");
+                ok = pdFALSE;
+        }
+#endif
 
         taskEXIT_CRITICAL();
         if (ok == pdPASS)

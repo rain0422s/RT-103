@@ -40,7 +40,9 @@
 #include "task.h"
 #include "timers.h"
 #include "stack_macros.h"
+#ifndef U8G2_ENABLED
 #include "lvgl.h"
+#endif
 /* The default definitions are only available for non-MPU ports. The
  * reason is that the stack alignment requirements vary for different
  * architectures.*/
@@ -8696,7 +8698,9 @@ void vTaskResetState( void )
 
 void vApplicationTickHook( void )
 {
+#ifndef U8G2_ENABLED
         lv_tick_inc(1);
+#endif
 }
 
 /*-----------------------------------------------------------*/
