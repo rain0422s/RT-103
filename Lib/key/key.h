@@ -4,6 +4,11 @@
 #include "FreeRTOS.h"
 #include "gpio.h"
 #include "utils.h"
+
+/** 电源使能脚（板级定义）：上电拉高、关机拉低 */
+#define PowerOn   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_10, GPIO_PIN_SET)
+#define PowerDown HAL_GPIO_WritePin(GPIOB, GPIO_PIN_10, GPIO_PIN_RESET)
+
 typedef enum{
         IDLE_STATE=0,   //空闲
         PRESS_DETECTED_STATE,  //按键按下
@@ -14,5 +19,5 @@ typedef enum{
         LONG_PRESS_STATE_END //长按结束状态
 }ButtonState;
 
-ButtonState button_scan(bool istiming,ButtonState* buttonState);
+ButtonState button_scan(bool istiming, ButtonState *buttonState);
 #endif

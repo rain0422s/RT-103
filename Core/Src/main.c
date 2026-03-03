@@ -45,6 +45,8 @@
 #include "semphr.h"
 #include "led_control.h"
 #include "gesture.h"
+#include "uart_forward.h"
+#include "power_key.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -60,10 +62,6 @@ SHT3xObjectType sht;
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
-#define PowerOn         HAL_GPIO_WritePin(GPIOB, GPIO_PIN_10, GPIO_PIN_SET);
-#define PowerDown       HAL_GPIO_WritePin(GPIOB, GPIO_PIN_10, GPIO_PIN_RESET);
-#define POWERKEY_GPIO_PORT      GPIOB
-#define POWERKEY_GPIO_PIN       GPIO_PIN_11
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
@@ -73,236 +71,6 @@ static void Creator(void); /* 用于创建和初始化FreeRTOS中的所有任务
 static TaskHandle_t V_handle_task_Creator = NULL;
 TaskHandle_t V_handle_task_DeviceStart = NULL;
 TaskHandle_t V_handle_task_IdleLED = NULL;
-TaskHandle_t xHandleTsak = NULL;
-TaskHandle_t xHandleTsak1 = NULL;
-TimerHandle_t xLedTimer;
-#define POWER_KEY_EVENT  (0x01 << 6)
-bool time_flag=false;
-EventGroupHandle_t myxEventGroupHandle_t = NULL;
-
-#define USART_LEN 64
-
-/* DMA接收缓冲 */
-uint8_t usart1_rx_DMA_buffer[USART_LEN];
-uint8_t usart2_rx_DMA_buffer[USART_LEN];
-
-
-/* 发送缓存，任务里拷贝数据后发送 */
-uint8_t usart1_tx_buf[USART_LEN];
-uint8_t usart2_tx_buf[USART_LEN];
-
-
-/* UART、DMA句柄，由CubeMX或手动定义 */
-extern DMA_HandleTypeDef hdma_usart2_rx;
-extern DMA_HandleTypeDef hdma_usart2_tx;
-extern DMA_HandleTypeDef hdma_usart1_rx;
-extern DMA_HandleTypeDef hdma_usart1_tx;
-
-/* FreeRTOS 资源 */
-typedef struct {
-    UART_HandleTypeDef *huart;
-    uint8_t *rx_buf;
-    uint8_t *tx_buf;
-    SemaphoreHandle_t tx_sem;        // 发送信号量，保护DMA发送互斥
-    DMA_HandleTypeDef *hdma_rx;
-} uart_dev_t;
-
-typedef struct {
-    uart_dev_t *dev;
-    uint16_t size;
-} uart_event_t;
-
-QueueHandle_t uart_rx_queue;
-
-/* 任务句柄 */
-TaskHandle_t uart_forward_task_handle;
-
-
-uart_dev_t slave_uart = {
-    .huart = &huart1,
-    .rx_buf = usart1_rx_DMA_buffer,
-    .tx_buf = usart1_tx_buf,
-    .tx_sem = NULL,   // 后面初始化
-    .hdma_rx = &hdma_usart1_rx,
-};
-
-uart_dev_t master_uart = {
-    .huart = &huart2,
-    .rx_buf = usart2_rx_DMA_buffer,
-    .tx_buf = usart2_tx_buf,
-    .tx_sem = NULL,   // 后面初始化
-    .hdma_rx = &hdma_usart2_rx,
-};
-#define SLAVE_UART (&slave_uart)
-#define MASTER_UART (&master_uart)
-
-
-/* ----------------- 任务实现 ----------------- */
-
-static void forward_uart(uart_dev_t *dst, uint8_t *data, uint16_t size)
-{
-    taskENTER_CRITICAL();
-    memcpy(dst->tx_buf, data, size);
-    taskEXIT_CRITICAL();
-
-    if (xSemaphoreTake(dst->tx_sem, portMAX_DELAY) == pdTRUE) {
-        if (HAL_UART_Transmit_DMA(dst->huart, dst->tx_buf, size) != HAL_OK) {
-            xSemaphoreGive(dst->tx_sem);
-        }
-    }
-}
-
-void uart_forward_task(void *argument)
-{
-    uart_event_t event;
-
-    for (;;)
-    {
-        if (xQueueReceive(uart_rx_queue, &event, portMAX_DELAY) == pdPASS)
-        {
-            uart_dev_t *src = event.dev;
-
-            if (event.size == 0 || event.size > USART_LEN) 
-                continue;
-
-            // 谁发的 → 回发给谁
-            forward_uart(src, src->rx_buf, event.size);
-        }
-    }
-}
-
-
-void uart_start_idle_dma(uart_dev_t *uart_dev)
-{
-    HAL_UARTEx_ReceiveToIdle_DMA(uart_dev->huart, uart_dev->rx_buf, USART_LEN);
-    __HAL_DMA_DISABLE_IT(uart_dev->hdma_rx, DMA_IT_HT);
-}
-
-/* ----------------- 初始化 ----------------- */
-void uart_dma_init(void)
-{
-        // 先填指针和缓冲区
-        SLAVE_UART->tx_sem = xSemaphoreCreateBinary();
-        MASTER_UART->tx_sem = xSemaphoreCreateBinary();
-
-
-        /* 初始给信号量，表示DMA可用 */
-        xSemaphoreGive(SLAVE_UART->tx_sem);
-        xSemaphoreGive(MASTER_UART->tx_sem);
-
-        uart_rx_queue = xQueueCreate(8, sizeof(uart_event_t));
-
-        /* 启动DMA空闲接收 */
-        uart_start_idle_dma(SLAVE_UART);
-        uart_start_idle_dma(MASTER_UART);
-
-        xTaskCreate(uart_forward_task, "uart_fwd", 256, NULL, 5, &uart_forward_task_handle);
-}
-
-/* ----------------- 中断回调 ----------------- */
-void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
-{
-        BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-        uart_event_t event;
-
-        uart_dev_t *dev = NULL;
-
-        if (huart == SLAVE_UART->huart) dev = SLAVE_UART;
-        else if (huart == MASTER_UART->huart) dev = MASTER_UART;
-
-        event.dev = dev;
-        event.size = Size;
-
-        /* 发送事件给任务 */
-        xQueueSendFromISR(uart_rx_queue, &event, &xHigherPriorityTaskWoken);
-
-        /* 重新启动DMA接收 */
-        uart_start_idle_dma(dev);
-        portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
-}
-
-
-/* ----------------- 发送完成回调 ----------------- */
-void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
-{
-        BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-        uart_dev_t *dev = NULL;
-
-        if (huart == SLAVE_UART->huart) dev = SLAVE_UART;
-        else if (huart == MASTER_UART->huart) dev = MASTER_UART;
-
-        xSemaphoreGiveFromISR(dev->tx_sem, &xHigherPriorityTaskWoken);
-        portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
-}
-
-
-
-
-/**
- * @brief Power key task: power key long press 2s -> KEY1 long press as confirm -> power down
- */
-static void power_key_task(void *arg)
-{
-        ButtonState buttonState = IDLE_STATE;
-        EventBits_t r_event;
-        (void)arg;
-
-        if (!myxEventGroupHandle_t) {
-                printf("[power] event group is NULL, task exit\n");
-                vTaskDelete(NULL);
-                return;
-        }
-        printf("[power] task started, waiting for POWER_KEY_EVENT\n");
-        for (;;) {
-                r_event = xEventGroupWaitBits(myxEventGroupHandle_t, POWER_KEY_EVENT,
-                                             pdTRUE, pdFALSE, portMAX_DELAY);
-                if ((r_event & POWER_KEY_EVENT) == 0)
-                        continue;
-
-                time_flag = false;
-                if (xTimerReset(xLedTimer, 0) != pdPASS) {
-                        printf("[power] Timer reset failed\n");
-                        continue;
-                }
-
-                while (!HAL_GPIO_ReadPin(POWERKEY_GPIO_PORT, POWERKEY_GPIO_PIN) && !time_flag)
-                        vTaskDelay(pdMS_TO_TICKS(10));
-
-                if (xTimerStop(xLedTimer, 0) != pdPASS) {
-                        printf("[power] Timer stop failed\n");
-                        continue;
-                }
-
-                if (time_flag) {
-                        buttonState = IDLE_STATE;
-                        if (button_scan(true, &buttonState) == LONG_PRESS_STATE) {
-                                led_control_send(LED_CMD_ALL_OFF);
-                                lfs_unmount_fs();
-                                led_blink(20, 100, 100);  /* 阻塞约 4s，闪烁完成后再关机 */
-                                PowerDown;
-                        }
-                }
-        }
-}
-
-void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
-{
-        BaseType_t pxHigherPriorityTaskWoken = pdFALSE;
-        uint32_t ulReturn;
-        uint16_t event = 0;
-        ulReturn = taskENTER_CRITICAL_FROM_ISR();
-        if (GPIO_Pin == POWERKEY_GPIO_PIN &&
-            HAL_GPIO_ReadPin(POWERKEY_GPIO_PORT, GPIO_Pin) == GPIO_PIN_RESET) {
-                event = POWER_KEY_EVENT;
-                xEventGroupSetBitsFromISR(myxEventGroupHandle_t, event, &pxHigherPriorityTaskWoken);
-                portYIELD_FROM_ISR(pxHigherPriorityTaskWoken);
-        }
-        taskEXIT_CRITICAL_FROM_ISR(ulReturn);
-}
-
-void vTimerCallback(TimerHandle_t xTimer) {
-        time_flag=true;
-}
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -355,7 +123,7 @@ int main(void)
   MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
   HAL_TIM_PWM_Start(&htim2,TIM_CHANNEL_1);
-        PowerOn;
+  PowerOn;
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -446,14 +214,7 @@ static void Creator(void)
                 ok = pdFALSE;
         }
 
-        myxEventGroupHandle_t = xEventGroupCreate();
-        if (!myxEventGroupHandle_t) {
-                printf("[Creator] xEventGroupCreate failed\n");
-                ok = pdFALSE;
-        }
-        xLedTimer = xTimerCreate("PowerKey2s", pdMS_TO_TICKS(2000), pdFALSE, (void *)0, vTimerCallback);
-        if (!xLedTimer) {
-                printf("[Creator] xTimerCreate failed\n");
+        if (power_key_create() != 1) {
                 ok = pdFALSE;
         }
 
@@ -461,11 +222,6 @@ static void Creator(void)
                 printf("[Creator] storage_init_task create failed\n");
                 ok = pdFALSE;
         }
-        if (xTaskCreate((TaskFunction_t)power_key_task, "power_key", 128, NULL, 2, &xHandleTsak) != pdPASS) {
-                printf("[Creator] power_key_task create failed\n");
-                ok = pdFALSE;
-        }
-
         led_ctl_queue = xQueueCreate(LED_CTL_QUEUE_LEN, sizeof(uint8_t));
         if (!led_ctl_queue)
                 ok = pdFALSE;
