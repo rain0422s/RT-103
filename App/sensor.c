@@ -49,46 +49,40 @@ static uint8_t mpu6050_init(void)
 }
 #endif /* MPU6050 */
 
-uint8_t sensor_init(SHT3xObjectType sht, uint16_t *ADC_Value, ADC_HandleTypeDef adc){
-        sht3x_init(&sht ,0x44,hi2c1);
-        HAL_ADCEx_Calibration_Start(&adc);
-        HAL_ADC_Start_DMA(&adc, (uint32_t *)ADC_Value, 100);
+uint8_t sensor_init(SHT3xObjectType sht, uint16_t *ADC_Value, ADC_HandleTypeDef adc)
+{
+	sht3x_init(&sht, 0x44, hi2c1);
+	HAL_ADCEx_Calibration_Start(&adc);
+	HAL_ADC_Start_DMA(&adc, (uint32_t *)ADC_Value, 100);
 #if 0
-        mpu6050_init();
+	mpu6050_init();
 #endif
+	return 0;
 }
 
-uint8_t get_sensor_value(SHT3xObjectType sht,uint16_t *ADC_Value){       
+uint8_t get_sensor_value(SHT3xObjectType sht, uint16_t *ADC_Value)
+{
+	uint32_t sum = 0;
+	for (int i = 0; i < 100; i++)
+		sum += ADC_Value[i];
+	float adc_vol = (float)sum / 100.0f / 4096.0f * 3.3f;
 
-        float ADC_Vol;
-        int adc;
+	printf("\r\n ADC: %f V\r\n", adc_vol);
+	delay_ms(300);
 
-        for(int i = 0,adc =0; i < 100;)
-        {
-                adc += ADC_Value[i++];
-        }
-        adc /= 100;
-
-        ADC_Vol =(float) adc/4096*3.3;
-        delay_ms(1);		
-
-        printf("\r\n %f \r\n",ADC_Vol);
-
-        printf("\r\n The adc value is %f \r\n",ADC_Vol);
-        delay_ms(300);
-
-        if (!sht3x_get_sensor_value(&sht))
-                printf("%4f, %4f\n", sht.temp, sht.rh);
-
-        delay_ms(500);
+	if (!sht3x_get_sensor_value(&sht))
+		printf("SHT: %.2f C, %.2f %%\n", (double)sht.temp, (double)sht.rh);
+	delay_ms(500);
+	return 0;
 }
 
 void sensor_task(void *arg)
 {
 	(void)arg;
-	// enable_fifo(&dev_ctx);
-	// lis2dh12_init();
-
+#if 0
+	enable_fifo(&dev_ctx);
+	lis2dh12_init();
+#endif
 	for (;;) {
 		breathing_led_run_once();
 		delay_ms(2000);
