@@ -11,4 +11,6 @@ typedef struct {
 
 void spi_flash_test();
 void i2c_eeprom_test();
+/** 开机后延时 30 秒再执行 LittleFS 与 EEPROM 初始化，执行完自删（FreeRTOS 任务入口） */
+void storage_init_task(void *arg);
 #endif

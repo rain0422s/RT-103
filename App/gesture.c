@@ -1,0 +1,31 @@
+#include "gesture.h"
+#include "key.h"
+#include "FreeRTOS.h"
+#include "task.h"
+#include <stdio.h>
+
+void gesture_task(void *arg)
+{
+	ButtonState buttonState = IDLE_STATE;
+	(void)arg;
+
+	for (;;) {
+		ButtonState evt = button_scan(false, &buttonState);
+
+		switch (evt) {
+		case SHORT_PRESS_STATE:
+			printf("[key] short press\n");
+			break;
+		case LONG_PRESS_STATE:
+			printf("[key] long press\n");
+			break;
+		case DOUBLE_PRESS_STATE:
+			printf("[key] double press\n");
+			break;
+		default:
+			break;
+		}
+
+		vTaskDelay(pdMS_TO_TICKS(10));
+	}
+}

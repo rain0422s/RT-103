@@ -1,5 +1,8 @@
 #include "storage.h"
 #include "lfs.h"
+#include "lfs_port.h"
+#include "FreeRTOS.h"
+#include "task.h"
 
 void spi_flash_test()
 {
@@ -127,4 +130,13 @@ void i2c_eeprom_test(){
 
         println("i[0]=%d,i[1]=%d,f=%f", obj.i[0], obj.i[1], obj.f);
 
+}
+
+void storage_init_task(void *arg)
+{
+	(void)arg;
+	vTaskDelay(pdMS_TO_TICKS(30000));  /* 延时 30 秒 */
+	lfs_first_run();
+	i2c_eeprom_test();
+	vTaskDelete(NULL);
 }

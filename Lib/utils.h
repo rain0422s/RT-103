@@ -48,6 +48,16 @@ static void os_delay_us(uint32_t nus)
 #define delay_ms(ms) vTaskDelay(ms)
 #define delay_us(us) os_delay_us(us)
 
+/** 忙等延时（毫秒），不让出 CPU，慎在任务中使用 */
+static inline void dly_ms(uint32_t ms)
+{
+	/* 每 1 毫秒约需循环 72000 次（72MHz/1000），加倍保险系数约 10 */
+	const uint32_t count_per_ms = 7200;
+	for (uint32_t i = 0; i < (ms * count_per_ms); i++) {
+		__NOP();
+	}
+}
+
 ///////////////////////////////////////////////// log
 
 

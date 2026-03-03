@@ -1,4 +1,6 @@
 #include "sensor.h"
+#include "led_control.h"
+#include "utils.h"
 
 
 //  /**
@@ -114,6 +116,18 @@ uint8_t get_sensor_value(SHT3xObjectType sht,uint16_t *ADC_Value){
 //         printf("ATK-MS6050 1111111222222222222!\r\n");
 //         /* 初始化ATK-MS6050 DMP */
 //         ret = atk_ms6050_dmp_init();
+
+void sensor_task(void *arg)
+{
+	(void)arg;
+	// enable_fifo(&dev_ctx);
+	// lis2dh12_init();
+
+	for (;;) {
+		breathing_led_run_once();
+		delay_ms(2000);
+	}
+}
 //         printf("[ line: %d | function: %s ] ret = %d" "\r\n", __LINE__, __FUNCTION__, ret);
 //         if (ret != 0)
 //         {

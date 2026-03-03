@@ -43,6 +43,8 @@
 #include "key.h"
 #include "queue.h"
 #include "semphr.h"
+#include "led_control.h"
+#include "gesture.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -58,23 +60,6 @@ SHT3xObjectType sht;
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
-#define BLUE_LED(x) do{ x? \
-	                     HAL_GPIO_WritePin(GPIOC, GPIO_PIN_10, GPIO_PIN_RESET): \
-	                     HAL_GPIO_WritePin(GPIOC, GPIO_PIN_10, GPIO_PIN_SET); \
-                 } while(0)
-
-/** Blink BLUE_LED: times × (on_ms on, off_ms off). Uses delay_ms (blocking). */
-static void led_blink(uint8_t times, uint32_t on_ms, uint32_t off_ms)
-{
-        for (uint8_t i = 0; i < times; i++) {
-                BLUE_LED(1);
-                delay_ms(on_ms);
-                BLUE_LED(0);
-                if (off_ms > 0 && i < times - 1)
-                        delay_ms(off_ms);
-        }
-}
-
 #define PowerOn         HAL_GPIO_WritePin(GPIOB, GPIO_PIN_10, GPIO_PIN_SET);
 #define PowerDown       HAL_GPIO_WritePin(GPIOB, GPIO_PIN_10, GPIO_PIN_RESET);
 #define POWERKEY_GPIO_PORT      GPIOB
@@ -84,11 +69,6 @@ static void led_blink(uint8_t times, uint32_t on_ms, uint32_t off_ms)
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-uint16_t pwmVal = 0;
-static volatile bool breathing_led_enabled = false;  /* 呼吸灯使能（volatile 保证多任务间可见） */
-
-void breathing_led_set(bool on);  /* 前向声明 */
-
 static void Creator(void); /* 用于创建和初始化FreeRTOS中的所有任务、事件和信号量 */
 static TaskHandle_t V_handle_task_Creator = NULL;
 TaskHandle_t V_handle_task_DeviceStart = NULL;
@@ -99,16 +79,6 @@ TimerHandle_t xLedTimer;
 #define POWER_KEY_EVENT  (0x01 << 6)
 bool time_flag=false;
 EventGroupHandle_t myxEventGroupHandle_t = NULL;
-
-/* 灯光控制任务：1=蓝灯闪4s 2=关蓝灯 3=开蓝灯 4=开呼吸灯 5=关呼吸灯 6=就绪(呼吸+闪4s) 7=全关 */
-enum { LED_CMD_BLINK_4S = 1, LED_CMD_OFF, LED_CMD_ON, LED_CMD_BREATH_ON, LED_CMD_BREATH_OFF, LED_CMD_READY, LED_CMD_ALL_OFF };
-#define LED_CTL_QUEUE_LEN  4
-QueueHandle_t led_ctl_queue = NULL;
-
-void led_control_send(uint8_t cmd);  /* 发送命令到灯光任务 */
-
-
-
 
 #define USART_LEN 64
 
@@ -344,149 +314,6 @@ void SystemClock_Config(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-/** 开机后延时 30 秒再执行 LittleFS 与 EEPROM 初始化，执行完自删 */
-static void storage_init_task(void *arg)
-{
-        (void)arg;
-        vTaskDelay(pdMS_TO_TICKS(30000));  /* 延时 30 秒 */
-        lfs_first_run();
-        i2c_eeprom_test();
-        vTaskDelete(NULL);
-}
-
-void gesture_task(void* arg)
-{
-        ButtonState buttonState = IDLE_STATE;
-
-        for (;;) {
-                ButtonState evt = button_scan(false, &buttonState);
-
-                switch (evt) {
-                        case SHORT_PRESS_STATE:
-                                printf("[key] short press\n");
-                                break;
-                        case LONG_PRESS_STATE:
-                                printf("[key] long press\n");
-                                break;
-                        case DOUBLE_PRESS_STATE:
-                                printf("[key] double press\n");
-                                break;
-                        default:
-                                break;
-                }
-
-                vTaskDelay(pdMS_TO_TICKS(10));
-        }
-}
-#define lis2dh12_INT1_GPIO_Port   GPIOA
-#define lis2dh12_INT1_Pin         GPIO_PIN_11
-#define lis2dh12_INT2_GPIO_Port   GPIOA
-#define lis2dh12_INT2_Pin         GPIO_PIN_12
-
-/** 呼吸灯：一次从暗到亮再到暗（循环内检查使能，关闭时可立即退出） */
-static void breathing_led_once(void)
-{
-        while (pwmVal < 1000 && breathing_led_enabled)
-        {
-                pwmVal++;
-                __HAL_TIM_SetCompare(&htim2, TIM_CHANNEL_1, pwmVal);
-                delay_ms(1);
-        }
-        if (!breathing_led_enabled)
-                return;
-        while (pwmVal && breathing_led_enabled)
-        {
-                pwmVal--;
-                __HAL_TIM_SetCompare(&htim2, TIM_CHANNEL_1, pwmVal);
-                delay_ms(1);
-        }
-}
-
-/**
- * @brief 呼吸灯开关
- * @param on true=打开呼吸灯（循环执行 breathing_led_once），false=关闭呼吸灯（灭灯）
- */
-void breathing_led_set(bool on)
-{
-        breathing_led_enabled = on;
-        if (!on)
-        {
-                pwmVal = 0;
-                __HAL_TIM_SetCompare(&htim2, TIM_CHANNEL_1, 999);
-        }
-}
-
-void led_control_send(uint8_t cmd)
-{
-        if (led_ctl_queue)
-                xQueueSend(led_ctl_queue, &cmd, 0);
-}
-
-/** 灯光控制任务：栈 96 字，接收 1/2/3/4/5 执行对应灯控 */
-static void led_control_task(void *arg)
-{
-        uint8_t cmd;
-        (void)arg;
-
-        for (;;) {
-                if (xQueueReceive(led_ctl_queue, &cmd, portMAX_DELAY) != pdPASS)
-                        continue;
-
-                switch (cmd) {
-                case LED_CMD_BLINK_4S:
-                        led_blink(20, 100, 100);  /* 4s ≈ 20×(100+100)ms */
-                        break;
-                case LED_CMD_OFF:
-                        BLUE_LED(0);
-                        break;
-                case LED_CMD_ON:
-                        BLUE_LED(1);
-                        break;
-                case LED_CMD_BREATH_ON:
-                        breathing_led_set(true);
-                        break;
-                case LED_CMD_BREATH_OFF:
-                        breathing_led_set(false);
-                        break;
-                case LED_CMD_READY:
-                        breathing_led_set(true);
-                        led_blink(20, 100, 100);
-                        break;
-                case LED_CMD_ALL_OFF:
-                        breathing_led_set(false);
-                        BLUE_LED(0);
-                        break;
-                default:
-                        break;
-                }
-        }
-}
-
-void sensor_task(void* arg)
-{ 
-        // enable_fifo(&dev_ctx);
- 
-        // lis2dh12_init();       
-
-        while (1)
-        {
-                if (breathing_led_enabled)
-                {
-                        breathing_led_once();
-                }
-                delay_ms(2000);
-        }
-}
-void dly_ms(uint32_t ms)
-{
-    // 每1毫秒大约需要循环72000次（72MHz / 1000）
-    // 一个for循环约消耗1个周期（估算），加倍保险系数为10
-    const uint32_t count_per_ms = 7200; // 实测可调
-    for (uint32_t i = 0; i < (ms * count_per_ms); i++) {
-        __NOP(); // 空操作，避免被优化掉
-    }
-}
-
 /* USER CODE END 0 */
 
 /**
