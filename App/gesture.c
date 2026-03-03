@@ -26,6 +26,6 @@ void gesture_task(void *arg)
 			break;
 		}
 
-		vTaskDelay(pdMS_TO_TICKS(10));
+		vTaskDelay(pdMS_TO_TICKS(5));   /* 5ms 轮询，配合 key 10ms 扫描更灵敏 */
 	}
 }

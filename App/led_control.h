@@ -24,7 +24,7 @@ void led_control_send(uint8_t cmd);
 void breathing_led_set(bool on);
 /** 执行一次呼吸灯周期（若未使能则立即返回），供 sensor_task 等调用 */
 void breathing_led_run_once(void);
-/** 蓝灯闪烁 times×(on_ms 亮, off_ms 灭)，阻塞 */
+/** 蓝灯闪烁 times×(on_ms 亮, off_ms 灭)，阻塞（仅无定时器时备用） */
 void led_blink(uint8_t times, uint32_t on_ms, uint32_t off_ms);
 void led_control_task(void *arg);
 

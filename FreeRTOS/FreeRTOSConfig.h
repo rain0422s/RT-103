@@ -47,8 +47,8 @@
 #define configUSE_MALLOC_FAILED_HOOK            0
 // 是否使用软件定时器
 #define configUSE_TIMERS                        1
-// 设置软件定时器服务/守护进程的优先级
-#define configTIMER_TASK_PRIORITY               3
+// 设置软件定时器服务/守护进程的优先级（提高以减少闪烁/呼吸灯被抢占）
+#define configTIMER_TASK_PRIORITY               8
 // 设置软件定时器命令队列的长度
 #define configTIMER_QUEUE_LENGTH                10
 // 设置软件定时器服务/守护进程任务的堆栈深度

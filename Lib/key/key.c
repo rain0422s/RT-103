@@ -8,13 +8,13 @@
 #define KEY1_GPIO_PORT   GPIOA
 #define KEY1_GPIO_PIN    GPIO_PIN_1
 
-/** Confirm timeout when istiming: 4s then return IDLE_STATE */
-#define CONFIRM_TIMEOUT_TICKS  pdMS_TO_TICKS(4000)
-#define SCAN_INTERVAL_MS       20
+/** Confirm timeout when istiming: 3s then return IDLE_STATE */
+#define CONFIRM_TIMEOUT_TICKS  pdMS_TO_TICKS(3000)
+#define SCAN_INTERVAL_MS       10   /* 扫描间隔 10ms，提高响应 */
 
 uint16_t SHORT_CLICK_THRESHOLD = 400;   /* ms: max gap between two clicks for double */
 uint16_t LONG_PRESS_THRESHOLD  = 1000;  /* ticks: long press threshold */
-uint16_t PRESS_Time            = 150;   /* ticks: debounce */
+uint16_t PRESS_Time            = 50;    /* ticks: 防抖 50ms，更快识别短按 */
 uint16_t BUTTON_ERROR_Time     = 1500;  /* ticks: stuck timeout */
 
 ButtonState button_scan(bool istiming, ButtonState *buttonState)
