@@ -92,6 +92,7 @@ void     w25qxx_reset();
 uint8_t  w25qxx_getstatus();
 uint8_t         w25qxx_write_enable();
 void            w25qxx_read_id(uint8_t* ID);
+void            w25qxx_read_jedec_id(uint8_t* ID);  /* 3 bytes: MF, Memory Type, Capacity (e.g. EF 40 15) */
 uint8_t         w25qxx_read(uint8_t* pData, uint32_t ReadAddr, uint32_t Size);
 uint8_t         w25qxx_write(uint8_t* pData, uint32_t WriteAddr, uint32_t Size);
 uint8_t         w25qxx_erase_block(uint32_t Address);

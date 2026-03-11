@@ -5,6 +5,7 @@
 #include "display.h"
 #ifdef U8G2_ENABLED
 #include "storage.h"
+#include "sensor.h"
 #endif
 
 /* ========== U8G2：U8G2_ENABLED 为 1 时走 U8G2；否则走 LVGL ========== */
@@ -30,11 +31,13 @@ typedef struct {
         uint8_t len;
 } setting_item_t;
 
+#define UI_INDEX_CALIB  4
 static const setting_item_t list[] = {
         {"list", 4},
         {"ab", 2},
         {"abc", 3},
         {"abcd", 4},
+        {"cal", 3},   /* 选中此项并按键：执行 LIS2DH12 校准并保存到 EEPROM */
 };
 
 static short frame_len, frame_len_trg;
@@ -115,6 +118,9 @@ static void ui_proc(u8g2_t *pu8g2)
                         };
                         storage_save_config(&c);
                 }
+                /* 选中「cal」时按键：执行零 g 校准并保存到 EEPROM */
+                if (ui_select == UI_INDEX_CALIB)
+                        sensor_lis2dh12_calibrate_and_save();
         }
         ui_show(pu8g2);
 }

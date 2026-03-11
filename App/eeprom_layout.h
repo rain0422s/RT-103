@@ -13,8 +13,18 @@
 #define EEPROM_CONFIG_VERSION 1
 
 #define EEPROM_OFFSET_CONFIG  0   /* eeprom_config_t (see below) */
-#define EEPROM_OFFSET_CALIB   32  /* future: ADC/sensor calibration */
+#define EEPROM_OFFSET_CALIB   32  /* lis2dh12_calib_t (zero-g offset in LSB) */
 #define EEPROM_OFFSET_STATS   64  /* future: power-on count, run time */
+
+#define EEPROM_CALIB_MAGIC    0xCA1B  /* valid LIS2DH12 calib */
+
+/** LIS2DH12 zero-g offset in raw LSB (2g HR: 1g ≈ 1024 LSB). Apply: calibrated = raw - offset. */
+typedef struct {
+	uint16_t magic;   /* EEPROM_CALIB_MAGIC if valid */
+	int16_t  offset_x;
+	int16_t  offset_y;
+	int16_t  offset_z;
+} lis2dh12_calib_t;
 
 /**
  * Persistent config saved to EEPROM.

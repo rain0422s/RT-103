@@ -10,13 +10,20 @@ typedef struct {
     float f;
 } object_t;
 
-void spi_flash_test();
-void i2c_eeprom_test();
+/** Flash (W25Qxx): idempotent init + read_id check (0xEF); only when present can LittleFS/flash ops be used. */
+void storage_flash_init(void);
+bool storage_flash_is_present(void);
+/** EEPROM: idempotent init + device detect; only when present can load/save be used. */
+void storage_eeprom_init(void);
+bool storage_eeprom_is_present(void);
 /** 开机后延时 30 秒再执行 LittleFS 与 EEPROM 初始化，执行完自删（FreeRTOS 任务入口） */
 void storage_init_task(void *arg);
 
-/** EEPROM config: call after EEPROM bus is ready (e.g. after storage_eeprom_init or storage_init_task). */
-void storage_eeprom_init(void);
+/** EEPROM config: call after storage_eeprom_init; load/save only work when storage_eeprom_is_present(). */
 bool storage_load_config(eeprom_config_t *out);
 bool storage_save_config(const eeprom_config_t *cfg);
+
+/** LIS2DH12 calibration (zero-g offset). Load/save to EEPROM_OFFSET_CALIB. */
+bool storage_load_lis2dh12_calib(lis2dh12_calib_t *out);
+bool storage_save_lis2dh12_calib(const lis2dh12_calib_t *cal);
 #endif

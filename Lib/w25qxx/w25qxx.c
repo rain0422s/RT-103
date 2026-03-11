@@ -95,6 +95,18 @@ void w25qxx_read_id(uint8_t* ID){
 }
 
 /**
+ * @brief  Read JEDEC ID (9Fh): 3 bytes = Manufacturer, Memory Type, Capacity. W25Q16JV returns EFh, 40h, 15h (Device ID 4015h).
+ */
+void w25qxx_read_jedec_id(uint8_t *ID)
+{
+	uint8_t cmd = READ_JEDEC_ID_CMD;
+	w25qxx_enable();
+	w25qxx_transmit(&cmd, 1);
+	w25qxx_receive(ID, 3);
+	w25qxx_disable();
+}
+
+/**
  * @brief  Reads an amount of data from the QSPI memory.
  * @param  pData: Pointer to data to be read
  * @param  ReadAddr: Read start address

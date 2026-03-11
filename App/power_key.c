@@ -2,6 +2,7 @@
 #include "led_control.h"
 #include "key.h"
 #include "lfs_port.h"
+#include "storage.h"
 #include "gpio.h"
 #include "FreeRTOS.h"
 #include "task.h"
@@ -64,7 +65,8 @@ static void power_key_task(void *arg)
 			led_control_send(LED_CMD_ALL_OFF);
 			buttonState = IDLE_STATE;
 			if (button_scan(true, &buttonState) == SHORT_PRESS_STATE) {
-				lfs_unmount_fs();
+				if (storage_flash_is_present())
+					lfs_unmount_fs();
 				led_control_send(LED_CMD_BLINK_4S);
 				vTaskDelay(pdMS_TO_TICKS(4000));
 				PowerDown;

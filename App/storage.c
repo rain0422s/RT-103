@@ -4,6 +4,7 @@
 #include "FreeRTOS.h"
 #include "task.h"
 #include <stdbool.h>
+#include <stdio.h>
 
 /* Shared EEPROM client for config load/save and test */
 static soft_i2c_t s_eeprom_bus = {
@@ -13,23 +14,34 @@ static soft_i2c_t s_eeprom_bus = {
 	.SDA_Pin  = GPIO_PIN_5,
 	.Interval = 6,
 };
+/* M24C02 EEPROM client: static storage (BSS), set at load time — no heap, no fragmentation. */
 static struct i2c_cli s_m24c02;
-static bool s_eeprom_inited;
+static bool s_eeprom_inited;   /* init (bus + client) has been run */
+static bool s_eeprom_present;  /* device responded on I2C; only then allow load/save */
 
+/** Idempotent: init I2C bus and M24C02 client, then detect device. If not present, EEPROM load/save APIs return false. */
 void storage_eeprom_init(void)
 {
+	if (s_eeprom_inited)
+		return;
 	s_m24c02.bus = &s_eeprom_bus;
 	s_m24c02.drv = &swi2c_drv;
 	s_m24c02.dev = AT24CXX_DEV;
 	s_m24c02.ops = I2C_DEV_7BIT | I2C_REG_8BIT;
 	swi2c_drv.init(&s_eeprom_bus);
 	i2cdrv_detector(&s_eeprom_bus, s_m24c02.drv);
+	s_eeprom_present = i2cdev_check(&s_m24c02);
 	s_eeprom_inited = true;
+}
+
+bool storage_eeprom_is_present(void)
+{
+	return s_eeprom_inited && s_eeprom_present;
 }
 
 bool storage_load_config(eeprom_config_t *out)
 {
-	if (!out || !s_eeprom_inited)
+	if (!out || !s_eeprom_inited || !s_eeprom_present)
 		return false;
 	if (!at24cxx_read(s_m24c02, EEPROM_OFFSET_CONFIG, (uint8_t *)out, sizeof(eeprom_config_t)))
 		return false;
@@ -45,121 +57,68 @@ bool storage_load_config(eeprom_config_t *out)
 
 bool storage_save_config(const eeprom_config_t *cfg)
 {
-	if (!cfg || !s_eeprom_inited)
+	if (!cfg || !s_eeprom_inited || !s_eeprom_present)
 		return false;
 	return at24cxx_write(s_m24c02, EEPROM_OFFSET_CONFIG, (uint8_t *)cfg, sizeof(eeprom_config_t));
 }
 
-void spi_flash_test()
+bool storage_load_lis2dh12_calib(lis2dh12_calib_t *out)
 {
-        uint8_t  ID[4];
-        uint8_t  i;
-        uint8_t  wData[100];
-        uint8_t  rData[100];
-	printf("SPI-W25Qxxx Example \n");
+	if (!out || !s_eeprom_inited || !s_eeprom_present)
+		return false;
+	if (!at24cxx_read(s_m24c02, EEPROM_OFFSET_CALIB, (uint8_t *)out, sizeof(lis2dh12_calib_t)))
+		return false;
+	if (out->magic != EEPROM_CALIB_MAGIC) {
+		out->magic   = EEPROM_CALIB_MAGIC;
+		out->offset_x = out->offset_y = out->offset_z = 0;
+		return false;
+	}
+	return true;
+}
 
-        /*1- Read the device ID */
-
-        w25qxx_reset();
-
-        w25qxx_read_id(ID);
-
-        printf("W25Qxxx ID is : ");
-        for (i = 0; i < 2; i++) {
-                printf("0x%02X ", ID[i]);
-        }
-        printf("\n");
-
-        /* 2- Erase */
-        if (w25qxx_erase_block(0) == W25Qx_OK)
-                printf(" SPI Erase Block ok\n");
-        else{
-                printf(" SPI Erase Block error\n");
-                return;
-        }
-
-
-        /*-2- Written to the flash */
-        /* fill buffer */
-        for (i = 0; i < 100; i++) {
-                wData[i] = i;
-                rData[i] = 0;
-        }
-
-        if (w25qxx_write(wData, 0x00, 100) == W25Qx_OK)
-                printf(" SPI Write ok\n");
-        else{
-                printf(" SPI Write error\n");
-                return;
-        }
-
-        /* 3- Read the flash */
-        if (w25qxx_read(rData, 0x00, 100) == W25Qx_OK)
-                printf(" SPI Read ok\n");
-        else{
-                printf(" SPI Read error\n");
-                return;
-        }
-
-        printf("SPI Read Data : \n");
-
-        for (i = 0; i < 100; i++)
-                printf("0x%02X  ", rData[i]);
-        printf("\n");
-
-        /* 4- check date */
-        if (memcmp(wData, rData, 100) == 0){
-                printf(" W25Q64FV SPI Test OK\n");
-        }
-        else{
-                printf(" W25Q64FV SPI Test False\n");
-        }
-        if (w25qxx_erase_chip() == W25Qx_OK)
-                printf(" SPI Erase chip ok\n");
-        else{
-                printf(" SPI Erase chip error\n");
-                return;
-        }
-
-        
-        return ;
-} 
-
-
-
-void i2c_eeprom_test(void)
+bool storage_save_lis2dh12_calib(const lis2dh12_calib_t *cal)
 {
-	int i = 0;
-	object_t obj;
+	if (!cal || !s_eeprom_inited || !s_eeprom_present)
+		return false;
+	return at24cxx_write(s_m24c02, EEPROM_OFFSET_CALIB, (uint8_t *)cal, sizeof(lis2dh12_calib_t));
+}
 
-	if (!s_eeprom_inited)
-		storage_eeprom_init();
+/* ==================== W25Qxx SPI Flash init & presence ==================== */
 
-	obj.i[0] = 0;
-	obj.i[1] = 0;
-	obj.f    = 0;
-	at24cxx_read_variable(s_m24c02, 0x00, obj);
-	println("i[0]=%d,i[1]=%d,f=%f", obj.i[0], obj.i[1], obj.f);
-	println("i[0]=%d", i);
+/* W25Q16JV PDF: "Read JEDEC ID (9Fh)" / Identification table. 9Fh returns 3 bytes: id[0]=MF, id[1]=Memory Type, id[2]=Capacity; Device ID = 4015h (id[1]:id[2]). */
+#define W25QXX_MANUFACTURER_ID  0xEFU   /* Winbond */
+#define W25Q16_DEVICE_ID_H      0x40U   /* Memory Type */
+#define W25Q16_DEVICE_ID_L      0x15U   /* Capacity 16Mbit → Device ID 4015h */
 
-	obj.i[0] = 2568;
-	obj.i[1] = -888;
-	obj.f    = 6.289f;
-	i = 6;
-	at24cxx_write_variable(s_m24c02, 0x00, obj);
-	obj.i[0] = 0;
-	obj.i[1] = 0;
-	obj.f    = 0;
-	i = 0;
-	at24cxx_read_variable(s_m24c02, 0x00, obj);
-	println("i[0]=%d,i[1]=%d,f=%f", obj.i[0], obj.i[1], obj.f);
+static bool s_flash_inited;
+static bool s_flash_present;
+
+/** Idempotent: reset W25Qxx, read JEDEC ID (9Fh); if MF=0xEF and Device ID=4015h (0x40,0x15) for W25Q16JV, flash is present. */
+void storage_flash_init(void)
+{
+	if (s_flash_inited)
+		return;
+	w25qxx_reset();
+	uint8_t id[3];
+	w25qxx_read_jedec_id(id);
+	s_flash_present = (id[0] == W25QXX_MANUFACTURER_ID && id[1] == W25Q16_DEVICE_ID_H && id[2] == W25Q16_DEVICE_ID_L);
+	s_flash_inited = true;
+	if (s_flash_present)
+		printf("W25Q16 flash OK (ID EF 40 15)\n");
+}
+
+bool storage_flash_is_present(void)
+{
+	return s_flash_inited && s_flash_present;
 }
 
 void storage_init_task(void *arg)
 {
 	(void)arg;
 	vTaskDelay(pdMS_TO_TICKS(30000));  /* 延时 30 秒 */
-	lfs_first_run();
-	i2c_eeprom_test();
+	storage_flash_init();   /* reset + read_id; if present (0xEF), allow LittleFS */
+	if (storage_flash_is_present())
+		lfs_first_run();
+	storage_eeprom_init();   /* init bus + detect M24C02; if not present, load/save APIs return false */
 	vTaskDelete(NULL);
 }
