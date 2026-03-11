@@ -8,7 +8,7 @@ Environmental Monitoring Station (EMS) based on STM32F103RCT6.
 |---|---|
 | Temperature & Humidity | SHT3x sensor via I2C |
 | Motion Detection | LIS2DH12 3-axis accelerometer via SPI |
-| Analog Sensing | ADC (PA0) for analog sensor input |
+| Ambient Light Sensing | TEMT6000X01 light sensor via ADC (PA0) |
 | Display | LVGL (TFT) and U8G2 (OLED) dual display support |
 | Data Storage | W25Qxx SPI Flash (LittleFS) + M24C02 I2C EEPROM |
 | Serial Communication | USART1/USART2 with DMA bidirectional forwarding |
