@@ -4,20 +4,7 @@
  */
 #include "display.h"
 
-/* ========== LVGL：U8G2_ENABLED 未启用时走 LVGL ========== */
-#ifndef U8G2_ENABLED
-void demo_run(void)
-{
-        lv_init();
-        lv_port_disp_init();
-        while (1) {
-                delay_ms(10);
-                lv_timer_handler();
-        }
-}
-#endif
-
-/* ========== U8G2：U8G2_ENABLED 为 1 时走 U8G2，不走 LVGL ========== */
+/* ========== U8G2：U8G2_ENABLED 为 1 时走 U8G2；否则走 LVGL ========== */
 #ifdef U8G2_ENABLED
 #define CHECK_KEY(n)  ((n) ? HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_5) : HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_1))
 
@@ -149,6 +136,16 @@ void ui_task(void *arg)
         for (;;) {
                 loop1(&u8g2);
                 delay_ms(500);
+        }
+}
+#else
+void demo_run(void)
+{
+        lv_init();
+        lv_port_disp_init();
+        while (1) {
+                delay_ms(10);
+                lv_timer_handler();
         }
 }
 #endif /* U8G2_ENABLED */

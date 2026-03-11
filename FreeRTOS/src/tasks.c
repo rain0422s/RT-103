@@ -40,7 +40,9 @@
 #include "task.h"
 #include "timers.h"
 #include "stack_macros.h"
-#ifndef U8G2_ENABLED
+#include "display_config.h"
+#ifdef U8G2_ENABLED
+#else
 #include "lvgl.h"
 #endif
 /* The default definitions are only available for non-MPU ports. The
@@ -8698,7 +8700,8 @@ void vTaskResetState( void )
 
 void vApplicationTickHook( void )
 {
-#ifndef U8G2_ENABLED
+#ifdef U8G2_ENABLED
+#else
         lv_tick_inc(1);
 #endif
 }
