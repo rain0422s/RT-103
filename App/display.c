@@ -3,6 +3,9 @@
  * LVGL demo + U8G2 OLED UI (when U8G2_ENABLED)
  */
 #include "display.h"
+#ifdef U8G2_ENABLED
+#include "storage.h"
+#endif
 
 /* ========== U8G2：U8G2_ENABLED 为 1 时走 U8G2；否则走 LVGL ========== */
 #ifdef U8G2_ENABLED
@@ -103,6 +106,15 @@ static void ui_proc(u8g2_t *pu8g2)
                 }
                 frame_y_trg = ui_select * 15;
                 frame_len_trg = list[ui_select].len * 13;
+                {
+                        eeprom_config_t c = {
+                                .magic = EEPROM_MAGIC,
+                                .version = EEPROM_CONFIG_VERSION,
+                                .ui_select = ui_select,
+                                .reserved = 0,
+                        };
+                        storage_save_config(&c);
+                }
         }
         ui_show(pu8g2);
 }
@@ -131,7 +143,16 @@ void ui_test(u8g2_t *pu8g2)
 
 void ui_task(void *arg)
 {
-        (void)arg;
+        const int list_len = sizeof(list) / sizeof(list[0]);
+        int8_t init_sel = (int8_t)(intptr_t)arg;
+        if (init_sel < 0)
+                init_sel = 0;
+        if (init_sel >= list_len)
+                init_sel = list_len - 1;
+        ui_select = init_sel;
+        frame_y = frame_y_trg = init_sel * 15;
+        frame_len = frame_len_trg = list[init_sel].len * 12;
+        ui_flag = (init_sel == 0);
         ui_test(&u8g2);
         for (;;) {
                 loop1(&u8g2);

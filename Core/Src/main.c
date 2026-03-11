@@ -229,7 +229,12 @@ static void Creator(void)
                 ok = pdFALSE;
 
 #ifdef U8G2_ENABLED
-        if (xTaskCreate((TaskFunction_t)ui_task, "ui_task", 128, NULL, 5, NULL) != pdPASS) {
+        storage_eeprom_init();
+        eeprom_config_t eeprom_cfg;
+        if (!storage_load_config(&eeprom_cfg))
+                eeprom_cfg.ui_select = 0;
+        if (xTaskCreate((TaskFunction_t)ui_task, "ui_task", 128,
+                        (void *)(intptr_t)eeprom_cfg.ui_select, 5, NULL) != pdPASS) {
                 printf("[Creator] ui_task create failed\n");
                 ok = pdFALSE;
         }

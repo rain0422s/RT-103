@@ -3,6 +3,52 @@
 #include "lfs_port.h"
 #include "FreeRTOS.h"
 #include "task.h"
+#include <stdbool.h>
+
+/* Shared EEPROM client for config load/save and test */
+static soft_i2c_t s_eeprom_bus = {
+	.SCL_Port = GPIOB,
+	.SCL_Pin  = GPIO_PIN_0,
+	.SDA_Port = GPIOC,
+	.SDA_Pin  = GPIO_PIN_5,
+	.Interval = 6,
+};
+static struct i2c_cli s_m24c02;
+static bool s_eeprom_inited;
+
+void storage_eeprom_init(void)
+{
+	s_m24c02.bus = &s_eeprom_bus;
+	s_m24c02.drv = &swi2c_drv;
+	s_m24c02.dev = AT24CXX_DEV;
+	s_m24c02.ops = I2C_DEV_7BIT | I2C_REG_8BIT;
+	swi2c_drv.init(&s_eeprom_bus);
+	i2cdrv_detector(&s_eeprom_bus, s_m24c02.drv);
+	s_eeprom_inited = true;
+}
+
+bool storage_load_config(eeprom_config_t *out)
+{
+	if (!out || !s_eeprom_inited)
+		return false;
+	if (!at24cxx_read(s_m24c02, EEPROM_OFFSET_CONFIG, (uint8_t *)out, sizeof(eeprom_config_t)))
+		return false;
+	if (out->magic != EEPROM_MAGIC || out->version != EEPROM_CONFIG_VERSION) {
+		out->magic   = EEPROM_MAGIC;
+		out->version = EEPROM_CONFIG_VERSION;
+		out->ui_select = 0;
+		out->reserved  = 0;
+		return false; /* no valid data, use defaults already set */
+	}
+	return true;
+}
+
+bool storage_save_config(const eeprom_config_t *cfg)
+{
+	if (!cfg || !s_eeprom_inited)
+		return false;
+	return at24cxx_write(s_m24c02, EEPROM_OFFSET_CONFIG, (uint8_t *)cfg, sizeof(eeprom_config_t));
+}
 
 void spi_flash_test()
 {
@@ -81,55 +127,32 @@ void spi_flash_test()
 
 
 
-void i2c_eeprom_test(){
-        int i = 0;
-        object_t obj;
-        struct i2c_cli m24c02;
+void i2c_eeprom_test(void)
+{
+	int i = 0;
+	object_t obj;
 
+	if (!s_eeprom_inited)
+		storage_eeprom_init();
 
-        static soft_i2c_t swi2c3_bus = {
-                .SCL_Port = GPIOB,
-                .SCL_Pin  = GPIO_PIN_0,
-                .SDA_Port = GPIOC,
-                .SDA_Pin  = GPIO_PIN_5,
-                .Interval = 6,
-        };
+	obj.i[0] = 0;
+	obj.i[1] = 0;
+	obj.f    = 0;
+	at24cxx_read_variable(s_m24c02, 0x00, obj);
+	println("i[0]=%d,i[1]=%d,f=%f", obj.i[0], obj.i[1], obj.f);
+	println("i[0]=%d", i);
 
-
-        m24c02.bus = &swi2c3_bus,
-        m24c02.drv = &swi2c_drv,
-        m24c02.dev = AT24CXX_DEV,
-        m24c02.ops = I2C_DEV_7BIT | I2C_REG_8BIT,
-
-        swi2c_drv.init(&swi2c3_bus);
-        
-        i2cdrv_detector(&swi2c3_bus, m24c02.drv);
-
-        obj.i[0] = 0;
-        obj.i[1] = 0;
-        obj.f    = 0;
-
-        at24cxx_read_variable(m24c02 , 0x00 , obj);
-
-
-        println("i[0]=%d,i[1]=%d,f=%f", obj.i[0], obj.i[1], obj.f);
-        println("i[0]=%d", i);
-
-        obj.i[0] = 2568; 
-        obj.i[1] = -888;
-        obj.f    = 6.289;
-        i = 6;
-
-        at24cxx_write_variable(m24c02,0x00, obj);
-        obj.i[0] = 0;  
-        obj.i[1] = 0;
-        obj.f    = 0;
-        i = 0;
-        at24cxx_read_variable(m24c02,0x00, obj);
-
-
-        println("i[0]=%d,i[1]=%d,f=%f", obj.i[0], obj.i[1], obj.f);
-
+	obj.i[0] = 2568;
+	obj.i[1] = -888;
+	obj.f    = 6.289f;
+	i = 6;
+	at24cxx_write_variable(s_m24c02, 0x00, obj);
+	obj.i[0] = 0;
+	obj.i[1] = 0;
+	obj.f    = 0;
+	i = 0;
+	at24cxx_read_variable(s_m24c02, 0x00, obj);
+	println("i[0]=%d,i[1]=%d,f=%f", obj.i[0], obj.i[1], obj.f);
 }
 
 void storage_init_task(void *arg)
