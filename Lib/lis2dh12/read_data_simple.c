@@ -50,8 +50,8 @@
 /* ==================== 板级配置 ==================== */
 /* LIS2DH12 使用 SPI2，CS 引脚如下。若板子不同请修改 CS 宏。 */
 #ifdef MKI109V2
-#define CS_SPI2_GPIO_Port   GPIOC
-#define CS_SPI2_Pin         GPIO_PIN_7
+#define CS_SPI2_GPIO_Port   GPIOB
+#define CS_SPI2_Pin         GPIO_PIN_12
 #define CS_SPI1_GPIO_Port   GPIOA
 #define CS_SPI1_Pin         GPIO_PIN_4
 #endif
@@ -385,7 +385,7 @@ void lis2dh12_init(void)
 
         whoamI = 0;
         lis2dh12_device_id_get(&s_dev_ctx, &whoamI);
-        /* AN5005 (dm00365457): WHO_AM_I = 0x33; some parts return 0x41. Accept both. */
+        /* WHO_AM_I reg 0x0F: C110926 LIS2DH12TR 规格书为 0x33；部分型号/批次返回 0x41。SPI/I2C 同寄存器同值，接受 0x33 与 0x41。 */
         if (whoamI != LIS2DH12_ID && whoamI != 0x33U) {
                 printf("lis2dh12 error (whoamI=0x%02x)\n", (unsigned)whoamI);
         } else {
