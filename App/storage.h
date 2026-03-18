@@ -16,6 +16,7 @@ bool storage_flash_is_present(void);
 /** EEPROM: idempotent init + device detect; only when present can load/save be used. */
 void storage_eeprom_init(void);
 bool storage_eeprom_is_present(void);
+bool storage_eeprom_test(void);
 /** 开机后延时 30 秒再执行 LittleFS 与 EEPROM 初始化，执行完自删（FreeRTOS 任务入口） */
 void storage_init_task(void *arg);
 

@@ -91,6 +91,7 @@ void sensor_task(void *arg)
 
 	for (;;) {
 		breathing_led_run_once();
+        lis2dh12_read_data(lis2dh12_get_ctx());
 		delay_ms(2000);
 	}
 }

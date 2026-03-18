@@ -125,6 +125,7 @@ static void ui_proc(u8g2_t *pu8g2)
         ui_show(pu8g2);
 }
 
+static void loop1(u8g2_t *pu8g2) __attribute__((unused));
 static void loop1(u8g2_t *pu8g2)
 {
         key_scan();
@@ -133,22 +134,20 @@ static void loop1(u8g2_t *pu8g2)
 
 void ui_test(u8g2_t *pu8g2)
 {
+#if OLED_RAW_TEST_MODE
+        oled_raw_white_test(pu8g2);
+#else
         u8g2Init(pu8g2);
         delay_ms(1000);
-        u8g2_DrawLine(pu8g2, 0, 0, 127, 63);
-        u8g2_DrawLine(pu8g2, 127, 0, 0, 63);
-        u8g2_SendBuffer(pu8g2);
-        delay_ms(1000);
-        u8g2_ClearBuffer(pu8g2);
-        delay_ms(1000);
-        u8g2_DrawXBMP(pu8g2, 30, 20, 25, 25, u8g_logo_bits);
-        u8g2_SendBuffer(pu8g2);
-        u8g2_SetFont(pu8g2, u8g2_font_u8glib_4_tf);
+        oled_minimal_test(pu8g2);
+        delay_ms(1500);
         frame_len = frame_len_trg = list[ui_select].len * 12;
+#endif
 }
 
 void ui_task(void *arg)
 {
+        
         const int list_len = sizeof(list) / sizeof(list[0]);
         int8_t init_sel = (int8_t)(intptr_t)arg;
         if (init_sel < 0)
@@ -160,10 +159,16 @@ void ui_task(void *arg)
         frame_len = frame_len_trg = list[init_sel].len * 12;
         ui_flag = (init_sel == 0);
         ui_test(&u8g2);
+#if OLED_RAW_TEST_MODE
+        for (;;) {
+                delay_ms(1000);
+        }
+#else
         for (;;) {
                 loop1(&u8g2);
                 delay_ms(500);
         }
+#endif
 }
 #else
 void demo_run(void)

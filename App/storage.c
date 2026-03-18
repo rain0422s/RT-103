@@ -83,6 +83,49 @@ bool storage_save_lis2dh12_calib(const lis2dh12_calib_t *cal)
 	return at24cxx_write(s_m24c02, EEPROM_OFFSET_CALIB, (uint8_t *)cal, sizeof(lis2dh12_calib_t));
 }
 
+/** EEPROM test: backup one small block in the stats area, write a pattern, verify, then restore backup. */
+bool storage_eeprom_test(void)
+{
+	uint8_t backup[8];
+	uint8_t pattern[8] = { 'E', 'E', 'P', 'R', 0x12, 0x34, 0x56, 0x78 };
+	uint8_t verify[8];
+
+	if (!s_eeprom_inited || !s_eeprom_present) {
+		printf("M24C02 EEPROM not ready\n");
+		return false;
+	}
+
+	if (!at24cxx_read(s_m24c02, EEPROM_OFFSET_STATS, backup, sizeof(backup))) {
+		printf("M24C02 EEPROM test: backup read failed\n");
+		return false;
+	}
+
+	if (!at24cxx_write(s_m24c02, EEPROM_OFFSET_STATS, pattern, sizeof(pattern))) {
+		printf("M24C02 EEPROM test: pattern write failed\n");
+		return false;
+	}
+
+	if (!at24cxx_read(s_m24c02, EEPROM_OFFSET_STATS, verify, sizeof(verify))) {
+		printf("M24C02 EEPROM test: verify read failed\n");
+		(void)at24cxx_write(s_m24c02, EEPROM_OFFSET_STATS, backup, sizeof(backup));
+		return false;
+	}
+
+	if (memcmp(pattern, verify, sizeof(pattern)) != 0) {
+		printf("M24C02 EEPROM test: verify mismatch\n");
+		(void)at24cxx_write(s_m24c02, EEPROM_OFFSET_STATS, backup, sizeof(backup));
+		return false;
+	}
+
+	if (!at24cxx_write(s_m24c02, EEPROM_OFFSET_STATS, backup, sizeof(backup))) {
+		printf("M24C02 EEPROM test: restore failed\n");
+		return false;
+	}
+
+	printf("M24C02 EEPROM OK\n");
+	return true;
+}
+
 /* ==================== W25Qxx SPI Flash init & presence ==================== */
 
 /* W25Q16JV PDF: "Read JEDEC ID (9Fh)" / Identification table. 9Fh returns 3 bytes: id[0]=MF, id[1]=Memory Type, id[2]=Capacity; Device ID = 4015h (id[1]:id[2]). */
@@ -120,5 +163,7 @@ void storage_init_task(void *arg)
 	if (storage_flash_is_present())
 		lfs_first_run();
 	storage_eeprom_init();   /* init bus + detect M24C02; if not present, load/save APIs return false */
+	// if (storage_eeprom_is_present())
+	// 	storage_eeprom_test();
 	vTaskDelete(NULL);
 }

@@ -478,5 +478,14 @@ void lis2dh12_read_data(stmdev_ctx_t *dev_ctx)
                 sample.new_angle_x = (short)(180 - sample.new_angle_x);
                 sample.new_angle_y = (short)(180 - sample.new_angle_y);
         }
+
+        /* 实时日志：每次拿到新加速度/温度后输出一行，方便串口观察传感器动态。 */
+        sprintf((char *)tx_buffer,
+                "LIS2DH12 acc[mg]:%4.2f %4.2f %4.2f | temp[degC]:%6.2f | angle[deg]:%3d %3d %3d\r\n",
+                acceleration_mg[0], acceleration_mg[1], acceleration_mg[2],
+                temperature_degC,
+                sample.new_angle_x, sample.new_angle_y, sample.new_angle_z);
+        tx_com(tx_buffer, strlen((char const *)tx_buffer));
+
         (void)sample;
 }
