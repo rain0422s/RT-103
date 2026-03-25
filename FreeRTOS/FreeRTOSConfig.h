@@ -2,8 +2,8 @@
 #define FREERTOS_CONFIG_H__
 
 // 1. FreeRTOSConfig.h 启用 Hook
-#define configUSE_TRACE_FACILITY        1
-#define configUSE_APPLICATION_TASK_TAG  1
+#define configUSE_TRACE_FACILITY        0
+#define configUSE_APPLICATION_TASK_TAG  0
 // // 2. 定义任务切换 Hook（Trace 宏）
 // #define traceTASK_SWITCHED_IN()  \
 //         printf("Task in: [%s]\n", pcTaskGetName(NULL))
@@ -17,8 +17,8 @@
 #define configCPU_CLOCK_HZ                      72000000        
 // 系统节拍中断的频率，即1s进中断的次数，配置为1000就是一秒进1000次中断，系统节拍就是1s。
 #define configTICK_RATE_HZ                      1000
-// 任务最大优先级，对于STM32来说最大不要超过32
-#define configMAX_PRIORITIES                    32
+// 任务最大优先级：通常 10~15 足够；越大越占用更多内核数据结构（ready list 等）
+#define configMAX_PRIORITIES                    12
 // 任务最小栈大小
 #define configMINIMAL_STACK_SIZE                64
 // FreeRTOS 堆空间（48KB RAM 约用 30% 时可适当增大；16KB 仍留足余量）
@@ -29,18 +29,18 @@
 #define configUSE_16_BIT_TICKS                  0
 // 设置为1允许任务调度，为0不允许(时间片耗尽才让出CPU使用权)，该参数抢占式方式下才生效
 #define configIDLE_SHOULD_YIELD                 1
-// 设置是否使用互斥量
-#define configUSE_MUTEXES                       1
+// 设置是否使用互斥量（本工程未使用 mutex，仅使用二值信号量/队列/事件组/定时器）
+#define configUSE_MUTEXES                       0
 // 设置是否使用递归互斥量
 #define configUSE_RECURSIVE_MUTEXES             0
 // 设置是否使用计数信号量
 #define configUSE_COUNTING_SEMAPHORES           0
-// 设置可以记录的队列和信号量的最大数目
-#define configQUEUE_REGISTRY_SIZE               10
+// 队列/信号量注册表（仅用于调试可视化，不用则关掉省 RAM/Flash）
+#define configQUEUE_REGISTRY_SIZE               0
 // 是否使用空闲钩子函数
 #define configUSE_IDLE_HOOK                     0
 // 是否使用TICK嘀嗒钩子函数
-#define configUSE_TICK_HOOK                     1
+#define configUSE_TICK_HOOK                     0
 // 是否使用栈溢出检查
 #define configCHECK_FOR_STACK_OVERFLOW          0
 // 是否使用内存申请失败钩子函数

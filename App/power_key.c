@@ -32,11 +32,11 @@ static void power_key_task(void *arg)
 	(void)arg;
 
 	if (!power_key_evgrp) {
-		printf("[power] event group is NULL, task exit\n");
+		DBG_PRINTF("[power] event group is NULL, task exit\n");
 		vTaskDelete(NULL);
 		return;
 	}
-	printf("[power] task started, waiting for POWER_KEY_EVENT\n");
+	DBG_PRINTF("[power] task started, waiting for POWER_KEY_EVENT\n");
 	for (;;) {
 		r_event = xEventGroupWaitBits(power_key_evgrp, POWER_KEY_EVENT,
 					     pdTRUE, pdFALSE, portMAX_DELAY);
@@ -45,7 +45,7 @@ static void power_key_task(void *arg)
 
 		xEventGroupClearBits(power_key_evgrp, POWER_KEY_2S_ELAPSED);
 		if (xTimerReset(xLedTimer, 0) != pdPASS) {
-			printf("[power] Timer reset failed\n");
+			DBG_PRINTF("[power] Timer reset failed\n");
 			continue;
 		}
 
@@ -87,16 +87,17 @@ int power_key_create(void)
 {
 	power_key_evgrp = xEventGroupCreate();
 	if (!power_key_evgrp) {
-		printf("[Creator] xEventGroupCreate failed\n");
+		DBG_PRINTF("[Creator] xEventGroupCreate failed\n");
 		return 0;
 	}
 	xLedTimer = xTimerCreate("PowerKey2s", pdMS_TO_TICKS(2000), pdFALSE, (void *)0, vTimerCallback);
 	if (!xLedTimer) {
-		printf("[Creator] xTimerCreate failed\n");
+		DBG_PRINTF("[Creator] xTimerCreate failed\n");
 		return 0;
 	}
-	if (xTaskCreate(power_key_task, "power_key", 128, NULL, configMAX_PRIORITIES - 1, NULL) != pdPASS) {
-		printf("[Creator] power_key_task create failed\n");
+	/* Keep highest priority below configMAX_PRIORITIES-1 after trimming. */
+	if (xTaskCreate(power_key_task, "power_key", 128, NULL, 11, NULL) != pdPASS) {
+		DBG_PRINTF("[Creator] power_key_task create failed\n");
 		return 0;
 	}
 	return 1;

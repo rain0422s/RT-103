@@ -65,6 +65,19 @@ static inline void dly_ms(uint32_t ms)
 #include <stdint.h>
 #include <stdbool.h>
 
+/* Compile-time debug printing.
+ * DEBUG_PRINT=0: compile out all DBG_PRINTF calls.
+ * DEBUG_PRINT=1: DBG_PRINTF maps to printf.
+ */
+#ifndef DEBUG_PRINT
+#define DEBUG_PRINT 0
+#endif
+/*
+ * Use a normal if-statement so call sites don't need #if blocks.
+ * With DEBUG_PRINT=0, the compiler will optimize the whole branch away.
+ */
+#define DBG_PRINTF(...) do { if (DEBUG_PRINT) printf(__VA_ARGS__); } while (0)
+
 // separator
 #define SEPARATOR30       "-----------------------------"
 #define SEPARATOR60       "----------------------------------------------------------"

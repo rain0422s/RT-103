@@ -1,6 +1,7 @@
 #include "lfs.h"
 #include "w25qxx.h"
 #include "lfs_port.h"
+#include "utils.h"
 #define OFFSETBLOCK 		3
 /**
  * lfs与底层flash读数据接口
@@ -45,7 +46,7 @@ static int lfs_deskio_prog(const struct lfs_config *c, lfs_block_t block, lfs_of
  */
 static int lfs_deskio_erase(const struct lfs_config *c, lfs_block_t block)
 {
-        printf("block:%d,i:%d",block,(OFFSETBLOCK+block)*c->block_size);
+        DBG_PRINTF("block:%d,i:%d",block,(OFFSETBLOCK+block)*c->block_size);
 	if(W25Qx_OK == w25qxx_erase_block((OFFSETBLOCK+block)*c->block_size))
 	// int ret = w25qxx_erase_block((OFFSETBLOCK+block));
                 return LFS_ERR_OK;
@@ -115,7 +116,7 @@ int bytes_to_mb(uint32_t bytes) {
         uint32_t mb = mb_x1000 / 1000;
         uint32_t mb_frac = mb_x1000 % 1000;
 
-        printf("Converted to: %u.%03u MB\n", mb, mb_frac);
+        DBG_PRINTF("Converted to: %u.%03u MB\n", mb, mb_frac);
         return 0;
 }
 
@@ -163,8 +164,8 @@ int lfs_first_run(void)
         int total_blocks = lfs_w25qxx_cfg.block_count;
         int used_blocks = lfs_fs_size(&s_lfs);
         int free_blocks = total_blocks - used_blocks;
-        printf("Free space: %d blocks (%d bytes)\n",
-               free_blocks, free_blocks * lfs_w25qxx_cfg.block_size);
+        DBG_PRINTF("Free space: %d blocks (%d bytes)\n",
+                   free_blocks, free_blocks * lfs_w25qxx_cfg.block_size);
         bytes_to_mb(free_blocks * lfs_w25qxx_cfg.block_size);
 
         /* boot_count */
@@ -175,17 +176,17 @@ int lfs_first_run(void)
         lfs_file_rewind(&s_lfs, &file);
         lfs_file_write(&s_lfs, &file, &boot_count, sizeof(boot_count));
         lfs_file_close(&s_lfs, &file);
-        printf("boot_count: %d\n", (int)boot_count);
+        DBG_PRINTF("boot_count: %d\n", (int)boot_count);
 
         /* 列目录 */
         lfs_dir_t dir;
         struct lfs_info info;
         lfs_dir_open(&s_lfs, &dir, "/");
         while (lfs_dir_read(&s_lfs, &dir, &info)) {
-                printf("%s (%s, size: %d)\n",
-                       info.name,
-                       info.type == LFS_TYPE_REG ? "file" : "dir",
-                       info.size);
+                DBG_PRINTF("%s (%s, size: %d)\n",
+                           info.name,
+                           info.type == LFS_TYPE_REG ? "file" : "dir",
+                           info.size);
         }
         lfs_dir_close(&s_lfs, &dir);
 

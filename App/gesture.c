@@ -14,13 +14,13 @@ void gesture_task(void *arg)
 
 		switch (evt) {
 		case SHORT_PRESS_STATE:
-			printf("[key] short press\n");
+			DBG_PRINTF("[key] short press\n");
 			break;
 		case LONG_PRESS_STATE:
-			printf("[key] long press\n");
+			DBG_PRINTF("[key] long press\n");
 			break;
 		case DOUBLE_PRESS_STATE:
-			printf("[key] double press\n");
+			DBG_PRINTF("[key] double press\n");
 			break;
 		default:
 			break;

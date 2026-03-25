@@ -22,13 +22,8 @@
 #include "stm32f1xx_it.h"
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "display_config.h"
 #include "FreeRTOS.h"
 #include "task.h"
-#ifdef U8G2_ENABLED
-#else
-#include "lvgl.h"
-#endif
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/

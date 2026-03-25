@@ -1,15 +1,11 @@
 /**
  * @file display.c
- * LVGL demo + U8G2 OLED UI (when U8G2_ENABLED)
+ * U8G2 OLED UI
  */
 #include "display.h"
-#ifdef U8G2_ENABLED
 #include "storage.h"
 #include "sensor.h"
-#endif
 
-/* ========== U8G2：U8G2_ENABLED 为 1 时走 U8G2；否则走 LVGL ========== */
-#ifdef U8G2_ENABLED
 #define CHECK_KEY(n)  ((n) ? HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_5) : HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_1))
 
 static u8g2_t u8g2;
@@ -138,6 +134,8 @@ void ui_test(u8g2_t *pu8g2)
         oled_raw_white_test(pu8g2);
 #else
         u8g2Init(pu8g2);
+        /* Force a small ASCII font to avoid pulling in larger default fonts. */
+        u8g2_SetFont(pu8g2, u8g2_font_u8glib_4_tf);
         delay_ms(1000);
         oled_minimal_test(pu8g2);
         delay_ms(1500);
@@ -170,14 +168,3 @@ void ui_task(void *arg)
         }
 #endif
 }
-#else
-void demo_run(void)
-{
-        lv_init();
-        lv_port_disp_init();
-        while (1) {
-                delay_ms(10);
-                lv_timer_handler();
-        }
-}
-#endif /* U8G2_ENABLED */

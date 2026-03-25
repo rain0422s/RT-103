@@ -91,38 +91,38 @@ bool storage_eeprom_test(void)
 	uint8_t verify[8];
 
 	if (!s_eeprom_inited || !s_eeprom_present) {
-		printf("M24C02 EEPROM not ready\n");
+		DBG_PRINTF("M24C02 EEPROM not ready\n");
 		return false;
 	}
 
 	if (!at24cxx_read(s_m24c02, EEPROM_OFFSET_STATS, backup, sizeof(backup))) {
-		printf("M24C02 EEPROM test: backup read failed\n");
+		DBG_PRINTF("M24C02 EEPROM test: backup read failed\n");
 		return false;
 	}
 
 	if (!at24cxx_write(s_m24c02, EEPROM_OFFSET_STATS, pattern, sizeof(pattern))) {
-		printf("M24C02 EEPROM test: pattern write failed\n");
+		DBG_PRINTF("M24C02 EEPROM test: pattern write failed\n");
 		return false;
 	}
 
 	if (!at24cxx_read(s_m24c02, EEPROM_OFFSET_STATS, verify, sizeof(verify))) {
-		printf("M24C02 EEPROM test: verify read failed\n");
+		DBG_PRINTF("M24C02 EEPROM test: verify read failed\n");
 		(void)at24cxx_write(s_m24c02, EEPROM_OFFSET_STATS, backup, sizeof(backup));
 		return false;
 	}
 
 	if (memcmp(pattern, verify, sizeof(pattern)) != 0) {
-		printf("M24C02 EEPROM test: verify mismatch\n");
+		DBG_PRINTF("M24C02 EEPROM test: verify mismatch\n");
 		(void)at24cxx_write(s_m24c02, EEPROM_OFFSET_STATS, backup, sizeof(backup));
 		return false;
 	}
 
 	if (!at24cxx_write(s_m24c02, EEPROM_OFFSET_STATS, backup, sizeof(backup))) {
-		printf("M24C02 EEPROM test: restore failed\n");
+		DBG_PRINTF("M24C02 EEPROM test: restore failed\n");
 		return false;
 	}
 
-	printf("M24C02 EEPROM OK\n");
+	DBG_PRINTF("M24C02 EEPROM OK\n");
 	return true;
 }
 
@@ -146,8 +146,9 @@ void storage_flash_init(void)
 	w25qxx_read_jedec_id(id);
 	s_flash_present = (id[0] == W25QXX_MANUFACTURER_ID && id[1] == W25Q16_DEVICE_ID_H && id[2] == W25Q16_DEVICE_ID_L);
 	s_flash_inited = true;
-	if (s_flash_present)
-		printf("W25Q16 flash OK (ID EF 40 15)\n");
+	if (s_flash_present) {
+		DBG_PRINTF("W25Q16 flash OK (ID EF 40 15)\n");
+	}
 }
 
 bool storage_flash_is_present(void)

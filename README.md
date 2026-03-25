@@ -9,7 +9,7 @@ Environmental Monitoring Station (EMS) based on STM32F103RCT6.
 | Temperature & Humidity | SHT3x sensor via I2C |
 | Motion Detection | LIS2DH12 3-axis accelerometer via SPI |
 | Ambient Light Sensing | TEMT6000X01 light sensor via ADC (PA0) |
-| Display | LVGL (TFT) and U8G2 (OLED) dual display support |
+| Display | U8G2 OLED display |
 | Data Storage | W25Qxx SPI Flash (LittleFS) + M24C02 I2C EEPROM |
 | Serial Communication | USART1/USART2 with DMA bidirectional forwarding |
 | Power Management | Button on/off (short press / long press / double click) with breathing LED indicator |
@@ -20,7 +20,7 @@ Environmental Monitoring Station (EMS) based on STM32F103RCT6.
 - **MCU**: STM32F103RCT6 (ARM Cortex-M3, 72MHz, 256KB Flash, 48KB RAM)
 - **Sensors**: SHT3x (temperature & humidity), LIS2DH12 (accelerometer)
 - **Storage**: W25Qxx Flash + M24C02 EEPROM
-- **Display**: TFT (LVGL) or OLED (U8G2)
+- **Display**: OLED (U8G2)
 - **LEDs**: Red / Blue status LEDs + PWM breathing LED
 - **Button**: Short press, long press, double click detection
 - **Programming**: ST-Link (SWD) or Serial (UART)
@@ -33,7 +33,6 @@ App/            Application modules (sensor, display, storage)
 Lib/            Hardware driver libraries (SHT3x, W25Qxx, LIS2DH12, etc.)
 Drivers/        STM32 HAL drivers and CMSIS
 FreeRTOS/       FreeRTOS kernel source
-LVGL/           LVGL v9.3.0 graphics library
 ```
 
 ## Build

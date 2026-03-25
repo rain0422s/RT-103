@@ -40,11 +40,6 @@
 #include "task.h"
 #include "timers.h"
 #include "stack_macros.h"
-#include "display_config.h"
-#ifdef U8G2_ENABLED
-#else
-#include "lvgl.h"
-#endif
 /* The default definitions are only available for non-MPU ports. The
  * reason is that the stack alignment requirements vary for different
  * architectures.*/
@@ -8700,10 +8695,7 @@ void vTaskResetState( void )
 
 void vApplicationTickHook( void )
 {
-#ifdef U8G2_ENABLED
-#else
-        lv_tick_inc(1);
-#endif
+    /* No GUI tick hook required in current U8G2-only firmware. */
 }
 
 /*-----------------------------------------------------------*/

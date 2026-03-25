@@ -52,7 +52,6 @@
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
 uint16_t adc_value[100];
-SHT3xObjectType sht;
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -206,12 +205,12 @@ static void Creator(void)
         BaseType_t ok = pdPASS;
         if (xTaskCreate((TaskFunction_t)sensor_task, "sensor_task", 256, NULL, 3,
                         (TaskHandle_t *)&V_handle_task_DeviceStart) != pdPASS) {
-                printf("[Creator] sensor_task create failed\n");
+                DBG_PRINTF("[Creator] sensor_task create failed\n");
                 ok = pdFALSE;
         }
         if (xTaskCreate((TaskFunction_t)gesture_task, "gesture_task", 384, NULL, 10,
                         (TaskHandle_t *)&V_handle_task_IdleLED) != pdPASS) {
-                printf("[Creator] gesture_task create failed\n");
+                DBG_PRINTF("[Creator] gesture_task create failed\n");
                 ok = pdFALSE;
         }
 
@@ -220,7 +219,7 @@ static void Creator(void)
         }
 
         if (xTaskCreate((TaskFunction_t)storage_init_task, "storage_init", 512, NULL, 6, NULL) != pdPASS) {
-                printf("[Creator] storage_init_task create failed\n");
+                DBG_PRINTF("[Creator] storage_init_task create failed\n");
                 ok = pdFALSE;
         }
         led_ctl_queue = xQueueCreate(LED_CTL_QUEUE_LEN, sizeof(uint8_t));
@@ -236,7 +235,7 @@ static void Creator(void)
                 eeprom_cfg.ui_select = 0;
         if (xTaskCreate((TaskFunction_t)ui_task, "ui_task", 128,
                         (void *)(intptr_t)eeprom_cfg.ui_select, 5, NULL) != pdPASS) {
-                printf("[Creator] ui_task create failed\n");
+                DBG_PRINTF("[Creator] ui_task create failed\n");
                 ok = pdFALSE;
         }
 #endif
