@@ -14,34 +14,47 @@ extern void vPortSetupTimerInterrupt(void);
 // }
 
 static void os_delay_us(uint32_t nus)
-{ 
-        uint32_t ticks;
-        uint32_t told,tnow,reload,tcnt=0;
-        if((0x0001&(SysTick->CTRL)) ==0)    //定时器未工作
-                vPortSetupTimerInterrupt();  //初始化定时器
+{
+        if (nus == 0u)
+                return;
 
-        reload = SysTick->LOAD;                     //获取重装载寄存器值
-        ticks = nus * (SystemCoreClock / 1000000);  //计数时间值
+        if ((SysTick->CTRL & 0x0001u) == 0u)   // 定时器未工作
+                vPortSetupTimerInterrupt();     // 初始化定时器
 
-        vTaskSuspendAll();//阻止OS调度，防止打断us延时
-        told=SysTick->VAL;  //获取当前数值寄存器值（开始时数值）
-        while(1)
-        {
-                tnow=SysTick->VAL; //获取当前数值寄存器值
-                if(tnow!=told)  //当前值不等于开始值说明已在计数
-                {         
-                        if(tnow<told)  //当前值小于开始数值，说明未计到0
-                                tcnt+=told-tnow; //计数值=开始值-当前值
+        // SysTick 每 1us 的 tick 数（72MHz 下为 72）
+        const uint32_t ticks_per_us = (SystemCoreClock / 1000000u);
+        if (ticks_per_us == 0u)
+                return;
 
-                        else     //当前值大于开始数值，说明已计到0并重新计数
-                                tcnt+=reload-tnow+told;   //计数值=重装载值-当前值+开始值  （
-                                                        //已从开始值计到0） 
+        // 防止 nus * ticks_per_us 溢出
+        uint64_t target_ticks_64 = (uint64_t)nus * (uint64_t)ticks_per_us;
+        uint32_t target_ticks = (target_ticks_64 > 0xFFFFFFFFull) ? 0xFFFFFFFFu : (uint32_t)target_ticks_64;
 
-                        told=tnow;   //更新开始值
-                        if(tcnt>=ticks)break;  //时间超过/等于要延迟的时间,则退出.
-                } 
-        }  
-        xTaskResumeAll();	//恢复OS调度		   
+        const uint32_t reload_plus_one = SysTick->LOAD + 1u;
+        uint32_t elapsed_ticks = 0u;
+        uint32_t told = SysTick->VAL;
+        uint32_t tnow;
+
+        BaseType_t sched_suspended = pdFALSE;
+        if (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING) {
+                vTaskSuspendAll();  // 阻止 OS 调度，防止打断 us 延时
+                sched_suspended = pdTRUE;
+        }
+
+        while (elapsed_ticks < target_ticks) {
+                tnow = SysTick->VAL;
+                if (tnow != told) {
+                        if (tnow < told) {
+                                elapsed_ticks += (told - tnow);                     // 未回绕
+                        } else {
+                                elapsed_ticks += (told + reload_plus_one - tnow);   // 已回绕
+                        }
+                        told = tnow;
+                }
+        }
+
+        if (sched_suspended == pdTRUE)
+                xTaskResumeAll();  // 恢复 OS 调度
 } 
 
 // #define delay_ms(ms) HAL_Delay(ms)

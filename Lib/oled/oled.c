@@ -23,10 +23,11 @@ void* memcpy_byte(void* dst, const void* src, int n)
 
 static uint8_t s_oled_hw_inited;
 
-/* CH1116 外供 VCC 场景：关掉内部 DC-DC，保留外部 VPP 供电。 */
-static const uint8_t s_oled_external_vcc_fix_seq[] = {
+/* CH1116/SH1106 内供电场景：启用内部 DC-DC，并设置泵电压。 */
+static const uint8_t s_oled_internal_dcdc_fix_seq[] = {
         U8X8_START_TRANSFER(),
-        U8X8_CA(0x0ad, 0x08a),  /* DC-DC OFF, use external VCC/VPP */
+        U8X8_CA(0x0ad, 0x08b),  /* DC-DC ON, use internal charge pump */
+        U8X8_C(0x033),          /* set VPP to high level (datasheet/common demo uses 0x33) */
         U8X8_CA(0x081, 0x0ff),  /* max contrast for first-light test */
         U8X8_C(0x0a4),          /* resume from RAM */
         U8X8_C(0x0a6),          /* normal display */
@@ -101,10 +102,12 @@ uint8_t u8x8_byte_hw_spi3(u8x8_t* u8x8, uint8_t msg, uint8_t arg_int, void* arg_
     switch (msg) {
         case U8X8_MSG_BYTE_INIT: {
                 oled_hw_init();
+                /* Keep CS in idle(disabled) level after init, like u8x8 reference drivers. */
+                u8x8_gpio_SetCS(u8x8, u8x8->display_info->chip_disable_level);
                 break;
         }
         case U8X8_MSG_BYTE_START_TRANSFER: {
-            u8x8_gpio_SetCS(u8x8, 0);
+            u8x8_gpio_SetCS(u8x8, u8x8->display_info->chip_enable_level);
             u8x8_gpio_Delay(u8x8, U8X8_MSG_DELAY_NANO, u8x8->display_info->post_chip_enable_wait_ns);
             break;
         }
@@ -115,7 +118,7 @@ uint8_t u8x8_byte_hw_spi3(u8x8_t* u8x8, uint8_t msg, uint8_t arg_int, void* arg_
         }
         case U8X8_MSG_BYTE_END_TRANSFER: {
             u8x8_gpio_Delay(u8x8, U8X8_MSG_DELAY_NANO, u8x8->display_info->pre_chip_disable_wait_ns);
-            u8x8_gpio_SetCS(u8x8, 1);
+            u8x8_gpio_SetCS(u8x8, u8x8->display_info->chip_disable_level);
             break;
         }
         case U8X8_MSG_BYTE_SET_DC: {    
@@ -143,7 +146,12 @@ uint8_t u8x8_gpio_and_delay(u8x8_t* u8x8, uint8_t msg, uint8_t arg_int, void* ar
             oled_hw_init();
             break;
         case U8X8_MSG_DELAY_100NANO:  // delay arg_int * 100 nano seconds
-            __NOP();
+            if (arg_int > 0) {
+                volatile uint32_t n = arg_int;
+                while (n--) {
+                    __NOP();
+                }
+            }
             break;
         case U8X8_MSG_DELAY_NANO: {
             volatile uint32_t n = arg_int;
@@ -153,15 +161,26 @@ uint8_t u8x8_gpio_and_delay(u8x8_t* u8x8, uint8_t msg, uint8_t arg_int, void* ar
             break;
         }
         case U8X8_MSG_DELAY_10MICRO:  // delay arg_int * 10 micro seconds
-            for (uint16_t n = 0; n < 320; n++) {
-                __NOP();
+            if (arg_int > 0) {
+                delay_us((uint32_t)arg_int * 10u);
             }
             break;
         case U8X8_MSG_DELAY_MILLI:  // delay arg_int * 1 milli second
-            delay_ms(1);
+            if (arg_int > 0) {
+                delay_ms(arg_int);
+            }
             break;
         case U8X8_MSG_DELAY_I2C:  // arg_int is the I2C speed in 100KHz, e.g. 4 = 400 KHz
-            delay_us(5);
+            if (arg_int == 0) {
+                arg_int = 1;
+            }
+            {
+                uint32_t dly_us = 5u / arg_int;
+                if (dly_us == 0u) {
+                    dly_us = 1u;
+                }
+                delay_us(dly_us);
+            }
             break;                     // arg_int=1: delay by 5us, arg_int = 4: delay by 1.25us
         case U8X8_MSG_GPIO_I2C_CLOCK:  // arg_int=0: Output low at I2C clock pin
             break;                     // arg_int=1: Input dir with pullup high for I2C clock pin
@@ -201,15 +220,10 @@ uint8_t u8x8_gpio_and_delay(u8x8_t* u8x8, uint8_t msg, uint8_t arg_int, void* ar
 
 void u8g2Init(u8g2_t* u8g2)
 {
-        /* CH1116 外供 VCC：先用 SH1106/Winstar 兼容初始化，再覆盖成外供电源参数。 */
-        uint8_t tile_buf_height;
-        uint8_t *buf = u8g2_m_16_8_f(&tile_buf_height);
-
-        u8g2_SetupDisplay(u8g2, u8x8_d_sh1106_128x64_winstar, u8x8_cad_001,
-                          u8x8_byte_hw_spi3, u8x8_gpio_and_delay);
-        u8g2_SetupBuffer(u8g2, buf, tile_buf_height, u8g2_ll_hvline_vertical_top_lsb, U8G2_R0);
+        /* 使用 u8g2 提供的 SH1106 SPI noname 封装初始化。 */
+        u8g2_Setup_sh1106_128x64_noname_f(u8g2, U8G2_R0, u8x8_byte_hw_spi3, u8x8_gpio_and_delay);
         u8g2_InitDisplay(u8g2);
-        u8x8_cad_SendSequence(&u8g2->u8x8, s_oled_external_vcc_fix_seq);
+        u8x8_cad_SendSequence(&u8g2->u8x8, s_oled_internal_dcdc_fix_seq);
         u8g2_SetPowerSave(u8g2, 0); 
         u8g2_ClearBuffer(u8g2);
         u8g2_SetContrast(u8g2, 0xFF);
