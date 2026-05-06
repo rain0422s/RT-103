@@ -26,6 +26,8 @@ void lis2dh12_init(void);
 /** Return the device context used in init (for read_data/calibrate). */
 stmdev_ctx_t *lis2dh12_get_ctx(void);
 void lis2dh12_read_data(stmdev_ctx_t *dev_ctx);
+/** Get latest acceleration in mg from last successful read_data call. */
+uint8_t lis2dh12_get_last_accel_mg(float *x_mg, float *y_mg, float *z_mg);
 
 /** Zero-g calibration offset (LSB). Apply: calibrated_raw = raw - offset. */
 void lis2dh12_set_calib_offset(int16_t x, int16_t y, int16_t z);

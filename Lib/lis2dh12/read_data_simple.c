@@ -88,6 +88,7 @@ static float acceleration_mg[3];
 static float temperature_degC;
 static uint8_t whoamI;
 static uint8_t tx_buffer[TX_BUF_DIM];
+static uint8_t s_accel_valid;
 
 /** 零 g 校准偏移 (LSB)。应用方式：calibrated_raw = raw - offset。2g HR 下 1g ≈ 1024 LSB */
 static int16_t s_calib_offset[3] = { 0, 0, 0 };
@@ -454,6 +455,7 @@ void lis2dh12_read_data(stmdev_ctx_t *dev_ctx)
                 acceleration_mg[0] = LIS2DH12_FROM_FS_2g_HR_TO_mg(data_raw_acceleration.i16bit[0]);
                 acceleration_mg[1] = LIS2DH12_FROM_FS_2g_HR_TO_mg(data_raw_acceleration.i16bit[1]);
                 acceleration_mg[2] = LIS2DH12_FROM_FS_2g_HR_TO_mg(data_raw_acceleration.i16bit[2]);
+                s_accel_valid = 1U;
                 sprintf((char *)tx_buffer, "Acceleration [mg]:%4.2f\t%4.2f\t%4.2f\r\n",
                         acceleration_mg[0], acceleration_mg[1], acceleration_mg[2]);
                 /* tx_com(tx_buffer, strlen((char const *)tx_buffer)); */
@@ -488,4 +490,15 @@ void lis2dh12_read_data(stmdev_ctx_t *dev_ctx)
         tx_com(tx_buffer, strlen((char const *)tx_buffer));
 
         (void)sample;
+}
+
+uint8_t lis2dh12_get_last_accel_mg(float *x_mg, float *y_mg, float *z_mg)
+{
+        if (!s_accel_valid || !x_mg || !y_mg || !z_mg) {
+                return 0U;
+        }
+        *x_mg = acceleration_mg[0];
+        *y_mg = acceleration_mg[1];
+        *z_mg = acceleration_mg[2];
+        return 1U;
 }
