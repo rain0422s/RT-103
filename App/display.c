@@ -145,7 +145,7 @@ void ui_test(u8g2_t *pu8g2)
 
 void ui_task(void *arg)
 {
-        
+        DBG_PRINTF("[oled] ui_task entered\n");
         const int list_len = sizeof(list) / sizeof(list[0]);
         int8_t init_sel = (int8_t)(intptr_t)arg;
         if (init_sel < 0)

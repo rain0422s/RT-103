@@ -10,12 +10,12 @@
 #define CONFIG_SCREEN_WIDTH  128  // width of screen
 
 #define SSD1306_ADDRESS 0x78
-#define OLED_CS_PORT   GPIOC
-#define OLED_CS_PIN    GPIO_PIN_12
+#define OLED_CS_PORT   GPIOB
+#define OLED_CS_PIN    GPIO_PIN_9
 #define OLED_DC_PORT   GPIOB
 #define OLED_DC_PIN    GPIO_PIN_4
-#define OLED_RST_PORT  GPIOD
-#define OLED_RST_PIN   GPIO_PIN_2
+#define OLED_RST_PORT  GPIOB
+#define OLED_RST_PIN   GPIO_PIN_8
 
 uint8_t u8x8_byte_hw_spi3(u8x8_t* u8x8, uint8_t msg, uint8_t arg_int, void* arg_ptr);
 uint8_t u8x8_gpio_and_delay(u8x8_t* u8x8, uint8_t msg, uint8_t arg_int, void* arg_ptr);

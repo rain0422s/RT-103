@@ -97,10 +97,25 @@ static void oled_hw_init(void)
     s_oled_hw_inited = 1;
 }
 
+static void oled_write_cmd(uint8_t cmd)
+{
+    HAL_GPIO_WritePin(OLED_DC_PORT, OLED_DC_PIN, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(OLED_CS_PORT, OLED_CS_PIN, GPIO_PIN_RESET);
+    (void)HAL_SPI_Transmit(&hspi3, &cmd, 1, 1000);
+    HAL_GPIO_WritePin(OLED_CS_PORT, OLED_CS_PIN, GPIO_PIN_SET);
+    HAL_GPIO_WritePin(OLED_DC_PORT, OLED_DC_PIN, GPIO_PIN_SET);
+}
+
 uint8_t u8x8_byte_hw_spi3(u8x8_t* u8x8, uint8_t msg, uint8_t arg_int, void* arg_ptr)
 {
+    static uint8_t spi_err_reported = 0;
+    static uint8_t byte_init_reported = 0;
     switch (msg) {
         case U8X8_MSG_BYTE_INIT: {
+                if (!byte_init_reported) {
+                    byte_init_reported = 1;
+                    DBG_PRINTF("[oled] byte init entered\n");
+                }
                 oled_hw_init();
                 /* Keep CS in idle(disabled) level after init, like u8x8 reference drivers. */
                 u8x8_gpio_SetCS(u8x8, u8x8->display_info->chip_disable_level);
@@ -112,8 +127,13 @@ uint8_t u8x8_byte_hw_spi3(u8x8_t* u8x8, uint8_t msg, uint8_t arg_int, void* arg_
             break;
         }
         case U8X8_MSG_BYTE_SEND: {
-            if (HAL_SPI_Transmit(&hspi3, (uint8_t *)arg_ptr, arg_int, 1000) != HAL_OK)
+            if (HAL_SPI_Transmit(&hspi3, (uint8_t *)arg_ptr, arg_int, 1000) != HAL_OK) {
+                if (!spi_err_reported) {
+                    spi_err_reported = 1;
+                    DBG_PRINTF("[oled] SPI3 transmit failed, err=0x%08lx\n", (unsigned long)HAL_SPI_GetError(&hspi3));
+                }
                 return 0;
+            }
             break;
         }
         case U8X8_MSG_BYTE_END_TRANSFER: {
@@ -246,12 +266,31 @@ void oled_minimal_test(u8g2_t* u8g2)
 
 void oled_raw_white_test(u8g2_t* u8g2)
 {
-        if (u8g2 == NULL)
-                return;
-
-        /* 只做底层初始化，不发送任何绘图缓冲。 */
+        (void)u8g2;
         oled_hw_init();
-        u8g2_SetupDisplay(u8g2, u8x8_d_sh1106_128x64_winstar, u8x8_cad_001,
-                          u8x8_byte_hw_spi3, u8x8_gpio_and_delay);
-        u8x8_cad_SendSequence(&u8g2->u8x8, s_oled_raw_white_seq);
+        DBG_PRINTF("[oled] raw direct init begin\n");
+
+        /* Follow vendor STM32 SPI init flow directly. */
+        oled_write_cmd(0xAE); /* display off */
+        oled_write_cmd(0x02); /* lower column */
+        oled_write_cmd(0x10); /* higher column */
+        oled_write_cmd(0x40); /* display start line */
+        oled_write_cmd(0xB0); /* page address */
+        oled_write_cmd(0x81); oled_write_cmd(0xCF); /* contrast */
+        oled_write_cmd(0xA1); /* segment remap */
+        oled_write_cmd(0xA6); /* normal display */
+        oled_write_cmd(0xA8); oled_write_cmd(0x3F); /* multiplex */
+        oled_write_cmd(0xAD); oled_write_cmd(0x8B); /* charge pump on */
+        oled_write_cmd(0x33); /* VPP */
+        oled_write_cmd(0xC8); /* COM scan direction */
+        oled_write_cmd(0xD3); oled_write_cmd(0x00); /* display offset */
+        oled_write_cmd(0xD5); oled_write_cmd(0x80); /* osc */
+        oled_write_cmd(0xD9); oled_write_cmd(0x1F); /* precharge */
+        oled_write_cmd(0xDA); oled_write_cmd(0x12); /* COM pins */
+        oled_write_cmd(0xDB); oled_write_cmd(0x40); /* VCOMH */
+        oled_write_cmd(0xA4); /* output follows RAM */
+        oled_write_cmd(0xAF); /* display on */
+        oled_write_cmd(0xA5); /* entire display on (white) */
+
+        DBG_PRINTF("[oled] raw direct init done\n");
 }
