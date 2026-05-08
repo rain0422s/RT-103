@@ -123,6 +123,7 @@ int bytes_to_mb(uint32_t bytes) {
 /* 全局挂载：一直挂载，关机时再卸载 */
 static lfs_t s_lfs;
 static int s_mounted = 0;
+static uint32_t s_boot_count = 0;
 
 int lfs_mount_fs(void)
 {
@@ -153,6 +154,11 @@ lfs_t *lfs_get(void)
         return s_mounted ? &s_lfs : NULL;
 }
 
+uint32_t lfs_get_boot_count(void)
+{
+        return s_boot_count;
+}
+
 int lfs_first_run(void)
 {
         lfs_file_t file;
@@ -176,6 +182,7 @@ int lfs_first_run(void)
         lfs_file_rewind(&s_lfs, &file);
         lfs_file_write(&s_lfs, &file, &boot_count, sizeof(boot_count));
         lfs_file_close(&s_lfs, &file);
+        s_boot_count = boot_count;
         DBG_PRINTF("boot_count: %d\n", (int)boot_count);
 
         /* 列目录 */

@@ -157,19 +157,24 @@ bool storage_flash_is_present(void)
 	return s_flash_inited && s_flash_present;
 }
 
+bool storage_system_ready(void)
+{
+	return storage_flash_is_present() && (lfs_get() != NULL);
+}
+
 void storage_init_task(void *arg)
 {
 	(void)arg;
 	while (power_key_shutdown_active()) {
 		vTaskDelay(pdMS_TO_TICKS(20));
 	}
-	vTaskDelay(pdMS_TO_TICKS(30000));  /* 延时 30 秒 */
-	while (power_key_shutdown_active()) {
-		vTaskDelay(pdMS_TO_TICKS(20));
-	}
+	/* Mount flash FS ASAP so UI can enter system quickly and read boot_count. */
 	storage_flash_init();   /* reset + read_id; if present (0xEF), allow LittleFS */
 	if (storage_flash_is_present())
 		lfs_first_run();
+
+	/* Keep delayed init for non-critical EEPROM path. */
+	vTaskDelay(pdMS_TO_TICKS(30000));
 	while (power_key_shutdown_active()) {
 		vTaskDelay(pdMS_TO_TICKS(20));
 	}

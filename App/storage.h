@@ -19,6 +19,8 @@ bool storage_eeprom_is_present(void);
 bool storage_eeprom_test(void);
 /** 开机后延时 30 秒再执行 LittleFS 与 EEPROM 初始化，执行完自删（FreeRTOS 任务入口） */
 void storage_init_task(void *arg);
+/** True when flash filesystem is mounted and system data path is ready. */
+bool storage_system_ready(void);
 
 /** EEPROM config: call after storage_eeprom_init; load/save only work when storage_eeprom_is_present(). */
 bool storage_load_config(eeprom_config_t *out);

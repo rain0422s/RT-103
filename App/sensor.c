@@ -34,6 +34,7 @@ static float s_pitch_rate_signed_dps;
 static volatile uint8_t s_motion_irq_pending;
 static uint8_t s_int1_last_level;
 static uint8_t s_sensor_low_power_mode;
+static volatile sensor_6d_dir_t s_6d_dir = SENSOR_6D_DIR_UNKNOWN;
 
 static float rad_to_deg(float rad)
 {
@@ -112,18 +113,23 @@ static void sensor_handle_int1_orientation(stmdev_ctx_t *ctx)
 		return;
 	}
 	if (src.ia) {
-		const char *dir = "UNKNOWN";
-		if (src.xh) dir = "RIGHT";
-		else if (src.xl) dir = "LEFT";
-		else if (src.yh) dir = "FORWARD";
-		else if (src.yl) dir = "BACKWARD";
-		else if (src.zh) dir = "FACE_UP";
-		else if (src.zl) dir = "FACE_DOWN";
+		sensor_6d_dir_t dir = SENSOR_6D_DIR_UNKNOWN;
+		if (src.xh) dir = SENSOR_6D_DIR_RIGHT;
+		else if (src.xl) dir = SENSOR_6D_DIR_LEFT;
+		else if (src.yh) dir = SENSOR_6D_DIR_FORWARD;
+		else if (src.yl) dir = SENSOR_6D_DIR_BACKWARD;
+		else if (src.zh) dir = SENSOR_6D_DIR_FACE_UP;
+		else if (src.zl) dir = SENSOR_6D_DIR_FACE_DOWN;
 
-		(void)dir;
+		s_6d_dir = dir;
 		/* DBG_PRINTF("INT1 6D event: dir=%s | XL=%d XH=%d YL=%d YH=%d ZL=%d ZH=%d\n",
 		           dir, src.xl, src.xh, src.yl, src.yh, src.zl, src.zh); */
 	}
+}
+
+sensor_6d_dir_t sensor_get_6d_dir(void)
+{
+	return s_6d_dir;
 }
 
 static void sensor_update_attitude(float ax_mg, float ay_mg, float az_mg)
@@ -197,6 +203,9 @@ uint8_t get_sensor_value(uint16_t *ADC_Value)
 void sensor_task(void *arg)
 {
 	(void)arg;
+	while (!storage_system_ready()) {
+		vTaskDelay(pdMS_TO_TICKS(50));
+	}
 	stmdev_ctx_t *ctx = lis2dh12_get_ctx();
 	/* LIS2DH12 初始化并加载 EEPROM 中保存的零 g 校准（若有） */
 	lis2dh12_init();

@@ -21,8 +21,20 @@ typedef struct {
 	bool rotating;
 } sensor_attitude_t;
 
+typedef enum {
+	SENSOR_6D_DIR_UNKNOWN = 0,
+	SENSOR_6D_DIR_RIGHT,
+	SENSOR_6D_DIR_LEFT,
+	SENSOR_6D_DIR_FORWARD,
+	SENSOR_6D_DIR_BACKWARD,
+	SENSOR_6D_DIR_FACE_UP,
+	SENSOR_6D_DIR_FACE_DOWN,
+} sensor_6d_dir_t;
+
 /** Get latest filtered roll/pitch and rotation state. */
 bool sensor_get_attitude(sensor_attitude_t *out);
+/** Get latest 6D orientation direction (updated on INT1 event). */
+sensor_6d_dir_t sensor_get_6d_dir(void);
 /** Notify sensor task that motion interrupt has occurred (called from ISR). */
 void sensor_notify_motion_irq(void);
 #endif
