@@ -23,4 +23,6 @@ typedef struct {
 
 /** Get latest filtered roll/pitch and rotation state. */
 bool sensor_get_attitude(sensor_attitude_t *out);
+/** Notify sensor task that motion interrupt has occurred (called from ISR). */
+void sensor_notify_motion_irq(void);
 #endif

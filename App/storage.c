@@ -165,6 +165,6 @@ void storage_init_task(void *arg)
 		lfs_first_run();
 	storage_eeprom_init();   /* init bus + detect M24C02; if not present, load/save APIs return false */
 	// if (storage_eeprom_is_present())
-	// 	storage_eeprom_test();
+	 	storage_eeprom_test();
 	vTaskDelete(NULL);
 }

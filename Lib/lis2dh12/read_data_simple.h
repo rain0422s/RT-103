@@ -36,6 +36,7 @@ void lis2dh12_get_calib_offset(int16_t *x, int16_t *y, int16_t *z);
 uint8_t lis2dh12_calibrate(stmdev_ctx_t *dev_ctx);
 
 void clear_init1(stmdev_ctx_t *dev_ctx);
+void enable_activity_recognition(stmdev_ctx_t *dev_ctx);
 void enable_fifo_bypass(stmdev_ctx_t *dev_ctx);
 void enable_fifo(stmdev_ctx_t *dev_ctx);
 void read_fifo(stmdev_ctx_t *dev_ctx);

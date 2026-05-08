@@ -241,8 +241,9 @@ static void Creator(void)
 #endif
 
         taskEXIT_CRITICAL();
-        if (ok == pdPASS)
+        if (ok == pdPASS) {
                 led_control_send(LED_CMD_READY);
+        }
 
         vTaskDelete(V_handle_task_Creator);
 }

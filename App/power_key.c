@@ -4,6 +4,7 @@
 #include "lfs_port.h"
 #include "storage.h"
 #include "gpio.h"
+#include "sensor.h"
 #include "FreeRTOS.h"
 #include "task.h"
 #include "event_groups.h"
@@ -103,7 +104,6 @@ int power_key_create(void)
 	return 1;
 }
 
-
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
 	BaseType_t woken = pdFALSE;
@@ -111,5 +111,10 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 	if (GPIO_Pin == POWERKEY_GPIO_PIN && power_key_is_pressed()) {
 		xEventGroupSetBitsFromISR(power_key_evgrp, POWER_KEY_EVENT, &woken);
 		portYIELD_FROM_ISR(woken);
+		return;
+	}
+
+	if (GPIO_Pin == lis2dh12_INT2_Pin) {
+		sensor_notify_motion_irq();
 	}
 }
