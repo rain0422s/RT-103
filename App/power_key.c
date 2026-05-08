@@ -22,6 +22,8 @@
 
 static EventGroupHandle_t power_key_evgrp = NULL;
 static TimerHandle_t xLedTimer = NULL;
+/* Enter true immediately on power-key IRQ; cleared if shutdown is canceled. */
+static volatile bool s_shutdown_active = false;
 
 static void power_key_task(void *arg);
 static void vTimerCallback(TimerHandle_t xTimer);
@@ -47,6 +49,7 @@ static void power_key_task(void *arg)
 		xEventGroupClearBits(power_key_evgrp, POWER_KEY_2S_ELAPSED);
 		if (xTimerReset(xLedTimer, 0) != pdPASS) {
 			DBG_PRINTF("[power] Timer reset failed\n");
+			s_shutdown_active = false;
 			continue;
 		}
 
@@ -73,7 +76,11 @@ static void power_key_task(void *arg)
 				PowerDown;
 			} else {
 				led_control_send(LED_CMD_BREATH_ON);
+				s_shutdown_active = false;
 			}
+		} else {
+			/* Released before 2s, cancel shutdown flow and resume tasks. */
+			s_shutdown_active = false;
 		}
 	}
 }
@@ -104,11 +111,17 @@ int power_key_create(void)
 	return 1;
 }
 
+bool power_key_shutdown_active(void)
+{
+	return s_shutdown_active;
+}
+
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
 	BaseType_t woken = pdFALSE;
 
 	if (GPIO_Pin == POWERKEY_GPIO_PIN && power_key_is_pressed()) {
+		s_shutdown_active = true;
 		xEventGroupSetBitsFromISR(power_key_evgrp, POWER_KEY_EVENT, &woken);
 		portYIELD_FROM_ISR(woken);
 		return;

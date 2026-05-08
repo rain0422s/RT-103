@@ -1,4 +1,5 @@
 #include "gesture.h"
+#include "power_key.h"
 #include "key.h"
 #include "FreeRTOS.h"
 #include "task.h"
@@ -10,6 +11,10 @@ void gesture_task(void *arg)
 	(void)arg;
 
 	for (;;) {
+		if (power_key_shutdown_active()) {
+			vTaskDelay(pdMS_TO_TICKS(20));
+			continue;
+		}
 		ButtonState evt = button_scan(false, &buttonState);
 
 		switch (evt) {

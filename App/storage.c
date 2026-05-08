@@ -1,4 +1,5 @@
 #include "storage.h"
+#include "power_key.h"
 #include "lfs.h"
 #include "lfs_port.h"
 #include "FreeRTOS.h"
@@ -159,10 +160,19 @@ bool storage_flash_is_present(void)
 void storage_init_task(void *arg)
 {
 	(void)arg;
+	while (power_key_shutdown_active()) {
+		vTaskDelay(pdMS_TO_TICKS(20));
+	}
 	vTaskDelay(pdMS_TO_TICKS(30000));  /* 延时 30 秒 */
+	while (power_key_shutdown_active()) {
+		vTaskDelay(pdMS_TO_TICKS(20));
+	}
 	storage_flash_init();   /* reset + read_id; if present (0xEF), allow LittleFS */
 	if (storage_flash_is_present())
 		lfs_first_run();
+	while (power_key_shutdown_active()) {
+		vTaskDelay(pdMS_TO_TICKS(20));
+	}
 	storage_eeprom_init();   /* init bus + detect M24C02; if not present, load/save APIs return false */
 	// if (storage_eeprom_is_present())
 	 	storage_eeprom_test();

@@ -1,5 +1,6 @@
 #include "sensor.h"
 #include "led_control.h"
+#include "power_key.h"
 #include "utils.h"
 #include "storage.h"
 #include "read_data_simple.h"
@@ -212,6 +213,10 @@ void sensor_task(void *arg)
 	s_sensor_low_power_mode = 0U;
 	s_int1_last_level = (uint8_t)HAL_GPIO_ReadPin(lis2dh12_INT1_GPIO_Port, lis2dh12_INT1_Pin);
 	for (;;) {
+		if (power_key_shutdown_active()) {
+			vTaskDelay(pdMS_TO_TICKS(20));
+			continue;
+		}
 		const uint32_t now_ms = HAL_GetTick();
 		const uint32_t sample_interval_ms = continuous_mode ? SENSOR_ACTIVE_SAMPLE_MS : SENSOR_IDLE_SAMPLE_MS;
 		const bool sample_due = (now_ms - last_poll_ms) >= sample_interval_ms;
