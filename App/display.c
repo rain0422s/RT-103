@@ -7,7 +7,8 @@
 #include "sensor.h"
 #include "gesture.h"
 #include "lfs_port.h"
-#include <stdio.h>
+#include "ui_menu_registry.h"
+#include <string.h>
 
 extern const uint8_t u8g2_font_6x12_tf[];
 
@@ -20,24 +21,23 @@ typedef struct {
         uint8_t update_flag;
 } key_msg_t;
 
-typedef struct {
+typedef struct ui_menu_item {
         const char *str;
         uint8_t len;
-} setting_item_t;
+        void (*on_long_press)(u8g2_t *pu8g2);
+        struct ui_menu_item *next;
+} ui_menu_item_t;
 
-#define UI_INDEX_LIST   0
-#define UI_INDEX_CALIB  8
-static const setting_item_t list[] = {
-        {"list", 4},
-        {"ab", 2},
-        {"abc", 3},
-        {"abcd", 4},
-        {"temp", 4},
-        {"humi", 4},
-        {"press", 5},
-        {"light", 5},
-        {"cal", 3},   /* 选中此项并按键：执行 LIS2DH12 校准并保存到 EEPROM */
-};
+static bool ui_menu_register(const char *name, void (*on_long_press)(u8g2_t *pu8g2));
+static int ui_menu_count(void);
+static const ui_menu_item_t *ui_menu_get_by_index(int idx);
+
+#define UI_MENU_MAX_ITEMS 16
+static ui_menu_item_t s_menu_nodes[UI_MENU_MAX_ITEMS];
+static uint8_t s_menu_node_count;
+static ui_menu_item_t *s_menu_head;
+static ui_menu_item_t *s_menu_tail;
+static bool s_menu_defaults_registered;
 
 static short frame_len, frame_len_trg;
 static short frame_y, frame_y_trg;
@@ -53,37 +53,84 @@ static short s_text_y0 = 13;
 
 static key_msg_t key_msg = {0};
 static bool s_force_full_refresh = true;
-static char s_boot_item_text[24] = "boot:--";
+static volatile bool s_shutdown_prompt_show;
+static volatile bool s_shutdown_prompt_confirmed;
+static volatile uint8_t s_shutdown_prompt_progress_pct;
 
 static short abs_s(short i)
 {
         return (i < 0) ? (short)(~(i - 1)) : i;
 }
 
-static void ui_refresh_boot_item_text(void)
+void display_show_text_feedback(u8g2_t *pu8g2, const char *line1, const char *line2, uint16_t hold_ms)
 {
-        static uint32_t s_last_boot_count = 0xFFFFFFFFu;
-        static int s_last_mounted = -1;
-        const int mounted = (lfs_get() != NULL) ? 1 : 0;
-
-        if (!mounted) {
-                if (s_last_mounted != 0) {
-                        s_last_mounted = 0;
-                        (void)snprintf(s_boot_item_text, sizeof(s_boot_item_text), "boot:--");
-                        s_force_full_refresh = true;
-                }
+        if (pu8g2 == NULL)
                 return;
-        }
+        u8g2_ClearBuffer(pu8g2);
+        if (line1 != NULL)
+                u8g2_DrawStr(pu8g2, 8, 24, line1);
+        if (line2 != NULL)
+                u8g2_DrawStr(pu8g2, 8, 44, line2);
+        u8g2_SendBuffer(pu8g2);
+        delay_ms(hold_ms);
+}
 
-        {
-                const uint32_t boot_count = lfs_get_boot_count();
-                if (s_last_mounted != 1 || boot_count != s_last_boot_count) {
-                        s_last_mounted = 1;
-                        s_last_boot_count = boot_count;
-                        (void)snprintf(s_boot_item_text, sizeof(s_boot_item_text), "boot:%lu", (unsigned long)boot_count);
-                        s_force_full_refresh = true;
-                }
+static bool ui_menu_register(const char *name, void (*on_long_press)(u8g2_t *pu8g2))
+{
+        ui_menu_item_t *node;
+        size_t len;
+
+        if (name == NULL || s_menu_node_count >= UI_MENU_MAX_ITEMS)
+                return false;
+        node = &s_menu_nodes[s_menu_node_count];
+        node->str = name;
+        len = strlen(name);
+        node->len = (len > 255u) ? 255u : (uint8_t)len;
+        node->on_long_press = on_long_press;
+        node->next = NULL;
+
+        if (s_menu_head == NULL)
+                s_menu_head = node;
+        else
+                s_menu_tail->next = node;
+        s_menu_tail = node;
+        s_menu_node_count++;
+        return true;
+}
+
+bool display_menu_register_item(const char *name, void (*on_long_press)(u8g2_t *pu8g2))
+{
+        return ui_menu_register(name, on_long_press);
+}
+
+static int ui_menu_count(void)
+{
+        return (int)s_menu_node_count;
+}
+
+static const ui_menu_item_t *ui_menu_get_by_index(int idx)
+{
+        const ui_menu_item_t *it = s_menu_head;
+        int i = 0;
+
+        if (idx < 0)
+                return NULL;
+        while (it != NULL && i < idx) {
+                it = it->next;
+                i++;
         }
+        return (i == idx) ? it : NULL;
+}
+
+static void ui_execute_selected_action(u8g2_t *pu8g2)
+{
+        const ui_menu_item_t *item = ui_menu_get_by_index(ui_select);
+
+        if (item == NULL)
+                return;
+        if (item->on_long_press != NULL)
+                item->on_long_press(pu8g2);
+        s_force_full_refresh = true;
 }
 
 static void key_scan(void)
@@ -111,14 +158,76 @@ static uint8_t ui_run(short *a, short *a_trg, uint8_t step, uint8_t slow_cnt)
         return 1;
 }
 
+/** Vertical scroll indicator: opposite side of list text (right edge). */
+static void ui_draw_list_scroll_indicator(u8g2_t *pu8g2)
+{
+        const int list_len = ui_menu_count();
+        short visible_rows = (short)((CONFIG_SCREEN_HEIGHT - 2) / s_line_h);
+        const short track_x = (short)(CONFIG_SCREEN_WIDTH - 5);
+        const short track_w = 3;
+        const short track_top = 2;
+        const short track_h = (short)(CONFIG_SCREEN_HEIGHT - 4);
+        short thumb_h;
+        short thumb_y;
+
+        if (list_len <= 0)
+                return;
+        if (visible_rows < 1)
+                visible_rows = 1;
+
+        u8g2_DrawFrame(pu8g2, track_x, track_top, track_w, track_h);
+
+        if (list_len <= visible_rows) {
+                u8g2_DrawBox(pu8g2, (short)(track_x + 1), (short)(track_top + 1),
+                             (short)(track_w - 2), (short)(track_h - 2));
+                return;
+        }
+
+        thumb_h = (short)((visible_rows * track_h) / list_len);
+        if (thumb_h < 4)
+                thumb_h = 4;
+        if (thumb_h > track_h - 2)
+                thumb_h = (short)(track_h - 2);
+
+        {
+                const short scroll_max = (short)((list_len - visible_rows) * s_line_h);
+                const short inner = (short)(track_h - 2);
+                short sy = list_scroll_y;
+
+                thumb_y = (short)(track_top + 1);
+                if (scroll_max > 0) {
+                        if (sy < 0)
+                                sy = 0;
+                        else if (sy > scroll_max)
+                                sy = scroll_max;
+                        thumb_y += (short)(((long)(inner - thumb_h) * sy + scroll_max / 2) / scroll_max);
+                }
+                {
+                        const short max_y = (short)(track_top + 1 + inner - thumb_h);
+
+                        if (thumb_y > max_y)
+                                thumb_y = max_y;
+                }
+        }
+
+        u8g2_DrawBox(pu8g2, (short)(track_x + 1), thumb_y, (short)(track_w - 2), thumb_h);
+}
+
 static void ui_update_frame_target(u8g2_t *pu8g2)
 {
-        const short list_len = (short)(sizeof(list) / sizeof(list[0]));
+        const short list_len = (short)ui_menu_count();
         short visible_rows = (short)((CONFIG_SCREEN_HEIGHT - 2) / s_line_h);
         short top_index = 0;
-        const char *selected_text = (ui_select == 1) ? s_boot_item_text : list[ui_select].str;
+        const ui_menu_item_t *item = ui_menu_get_by_index(ui_select);
+        const char *selected_text = (item != NULL) ? item->str : "";
         const uint8_t text_w = (uint8_t)u8g2_GetStrWidth(pu8g2, selected_text);
 
+        if (list_len <= 0) {
+                frame_y_trg = 0;
+                frame_len_trg = 0;
+                list_scroll_y_trg = 0;
+                return;
+        }
         if (visible_rows < 1) {
                 visible_rows = 1;
         }
@@ -139,17 +248,22 @@ static void ui_update_frame_target(u8g2_t *pu8g2)
 
 static bool ui_show(u8g2_t *pu8g2, bool force_full)
 {
-        const int list_len = sizeof(list) / sizeof(list[0]);
+        const int list_len = ui_menu_count();
         const short prev_frame_y = frame_y;
         const short prev_frame_len = frame_len;
+        const ui_menu_item_t *it = s_menu_head;
+        int i = 0;
 
         u8g2_ClearBuffer(pu8g2);
-        for (int i = 0; i < list_len; i++) {
+        while (it != NULL && i < list_len) {
                 const short yy = (short)(s_text_y0 + i * s_line_h - list_scroll_y);
-                const char *line = (i == 1) ? s_boot_item_text : list[i].str;
+                const char *line = it->str;
                 u8g2_DrawStr(pu8g2, s_text_x, yy, line);
+                it = it->next;
+                i++;
         }
         u8g2_DrawRFrame(pu8g2, x, (short)(frame_y - list_scroll_y), frame_len, s_frame_h, 3);
+        ui_draw_list_scroll_indicator(pu8g2);
         {
                 const bool anim_y = ui_run(&frame_y, &frame_y_trg, 5, 4) != 0;
                 const bool anim_len = ui_run(&frame_len, &frame_len_trg, 10, 5) != 0;
@@ -165,18 +279,16 @@ static bool ui_show(u8g2_t *pu8g2, bool force_full)
 
 static bool ui_proc(u8g2_t *pu8g2)
 {
-        const int list_len = sizeof(list) / sizeof(list[0]);
+        const int list_len = ui_menu_count();
         bool got_ui_event = false;
+        if (list_len <= 0)
+                return ui_show(pu8g2, true);
         if (key_msg.update_flag && key_msg.long_press) {
                 key_msg.update_flag = 0;
                 key_msg.long_press = 0;
                 key_msg.press = 0;
                 got_ui_event = true;
-                if (ui_select == UI_INDEX_LIST) {
-                        oled_boot_splash_show(pu8g2);
-                        delay_ms(UI_BOOT_IMAGE_MS);
-                        s_force_full_refresh = true;
-                }
+                ui_execute_selected_action(pu8g2);
         } else if (key_msg.update_flag && key_msg.press) {
                 key_msg.update_flag = 0;
                 key_msg.press = 0;
@@ -201,9 +313,6 @@ static bool ui_proc(u8g2_t *pu8g2)
                         };
                         storage_save_config(&c);
                 }
-                /* 选中「cal」时按键：执行零 g 校准并保存到 EEPROM */
-                if (ui_select == UI_INDEX_CALIB)
-                        sensor_lis2dh12_calibrate_and_save();
         }
         return ui_show(pu8g2, s_force_full_refresh || got_ui_event);
 }
@@ -228,7 +337,6 @@ static bool loop1(u8g2_t *pu8g2)
                 s_force_full_refresh = true;
                 active = true;
         }
-        ui_refresh_boot_item_text();
         key_scan();
         {
                 const bool animating = ui_proc(pu8g2);
@@ -239,6 +347,13 @@ static bool loop1(u8g2_t *pu8g2)
                 }
         }
         return active;
+}
+
+void display_show_shutdown_prompt(bool show, bool confirmed, uint8_t progress_pct)
+{
+        s_shutdown_prompt_show = show;
+        s_shutdown_prompt_confirmed = confirmed;
+        s_shutdown_prompt_progress_pct = (progress_pct > 100u) ? 100u : progress_pct;
 }
 
 void ui_test(u8g2_t *pu8g2)
@@ -270,8 +385,19 @@ void ui_test(u8g2_t *pu8g2)
 
 void ui_task(void *arg)
 {
-        const int list_len = sizeof(list) / sizeof(list[0]);
+        int list_len;
         int8_t init_sel = (int8_t)(intptr_t)arg;
+
+        if (!s_menu_defaults_registered) {
+                ui_menu_registry_register_all(ui_menu_register);
+                s_menu_defaults_registered = true;
+        }
+        list_len = ui_menu_count();
+        if (list_len <= 0) {
+                for (;;) {
+                        delay_ms(200);
+                }
+        }
         if (init_sel < 0)
                 init_sel = 0;
         if (init_sel >= list_len)
@@ -291,6 +417,21 @@ void ui_task(void *arg)
                 delay_ms(200);
         }
         for (;;) {
+                if (s_shutdown_prompt_show) {
+                        const uint8_t pct = s_shutdown_prompt_progress_pct;
+                        const uint8_t bar_w = (uint8_t)((108u * pct) / 100u);
+                        u8g2_ClearBuffer(&u8g2);
+                        u8g2_DrawStr(&u8g2, 10, 22, "Power key pressed");
+                        if (s_shutdown_prompt_confirmed)
+                                u8g2_DrawStr(&u8g2, 10, 42, "Shutting down...");
+                        else
+                                u8g2_DrawStr(&u8g2, 10, 42, "Release to cancel");
+                        u8g2_DrawFrame(&u8g2, 10, 50, 108, 10);
+                        u8g2_DrawBox(&u8g2, 10, 50, bar_w, 10);
+                        u8g2_SendBuffer(&u8g2);
+                        delay_ms(60);
+                        continue;
+                }
                 const bool active = loop1(&u8g2);
                 /* Lower refresh load while keeping responsive interaction. */
                 delay_ms(active ? 10 : 100);

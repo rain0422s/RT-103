@@ -1,6 +1,5 @@
 #include "sensor.h"
 #include "led_control.h"
-#include "power_key.h"
 #include "utils.h"
 #include "storage.h"
 #include "read_data_simple.h"
@@ -20,9 +19,10 @@
 #define ROTATION_DYNACC_THRESHOLD_MG   120.0f
 #define SENSOR_ACTIVE_SAMPLE_MS        50U
 #define SENSOR_IDLE_SAMPLE_MS          500U
-#define SENSOR_INACTIVITY_TIMEOUT_MS   5000U
-#define INT2_WAKE_GUARD_MS             300U
-
+#define SENSOR_IDLE_TIMEOUT_MS         5000U
+#define SENSOR_FIFO_WTM_ACTIVE         12U
+#define SENSOR_FIFO_WTM_IDLE           4U
+#define SENSOR_FIFO_MAX_SAMPLES        32
 static sensor_attitude_t s_att = {0};
 static bool s_att_valid;
 static float s_ax_f;
@@ -32,9 +32,12 @@ static uint32_t s_last_update_ms;
 static float s_roll_rate_signed_dps;
 static float s_pitch_rate_signed_dps;
 static volatile uint8_t s_motion_irq_pending;
-static uint8_t s_int1_last_level;
-static uint8_t s_sensor_low_power_mode;
+static uint8_t s_fifo_irq_pending;
 static volatile sensor_6d_dir_t s_6d_dir = SENSOR_6D_DIR_UNKNOWN;
+static bool s_chip_high_perf;
+static uint32_t s_last_motion_ms;
+
+static void sensor_update_attitude(float ax_mg, float ay_mg, float az_mg);
 
 static float rad_to_deg(float rad)
 {
@@ -49,67 +52,90 @@ static float angle_delta_deg(float now_deg, float prev_deg)
 	return d;
 }
 
-static const char *sensor_rotation_direction_str(void)
+static void sensor_set_fifo_watermark(stmdev_ctx_t *ctx, bool high_perf)
 {
-	if (!s_att.rotating) {
-		return "STILL";
-	}
-
-	const float abs_roll_rate = fabsf(s_roll_rate_signed_dps);
-	const float abs_pitch_rate = fabsf(s_pitch_rate_signed_dps);
-	if (abs_roll_rate >= abs_pitch_rate) {
-		return (s_roll_rate_signed_dps >= 0.0f) ? "PITCH_UP" : "PITCH_DOWN";
-	}
-	return (s_pitch_rate_signed_dps >= 0.0f) ? "ROLL_RIGHT" : "ROLL_LEFT";
+	const uint8_t wtm = high_perf ? SENSOR_FIFO_WTM_ACTIVE : SENSOR_FIFO_WTM_IDLE;
+	(void)lis2dh12_config_fifo_set_watermark(ctx, wtm);
 }
 
-static void sensor_config_int1_int2(stmdev_ctx_t *ctx)
+static void sensor_config_int2_6d(stmdev_ctx_t *ctx)
 {
-	/* INT1: 6D orientation detect, mapped to PA11 (input/polling). */
-	(void)lis2dh12_config_int1_6d_4d(
-		ctx,
-		1, /* six_d */
-		1, 1, 1, 1, 1, 1, /* xh/xl/yh/yl/zh/zl */
-		18, /* threshold */
-		1   /* duration */
-	);
+	lis2dh12_int2_cfg_t cfg = { 0 };
+	cfg._6d = 1;
+	cfg.xhie = 1; cfg.xlie = 1;
+	cfg.yhie = 1; cfg.ylie = 1;
+	cfg.zhie = 1; cfg.zlie = 1;
+	(void)lis2dh12_int2_gen_conf_set(ctx, &cfg);
+	(void)lis2dh12_int2_gen_threshold_set(ctx, 18);
+	(void)lis2dh12_int2_gen_duration_set(ctx, 1);
 
-	/* INT2: activity/inactivity mapped to PA12 (EXTI interrupt). */
-	(void)lis2dh12_config_activity_inactivity(ctx, 12, 25);
-	/* Make INT2 more robust for MCU capture:
-	 * - explicit active-high polarity
-	 * - latched interrupt (cleared by reading INT2_SRC)
-	 */
 	lis2dh12_ctrl_reg6_t c6;
 	if (lis2dh12_pin_int2_config_get(ctx, &c6) == 0) {
-		c6.int_polarity = 0; /* active-high */
-		c6.i2_act = 1;
+		c6.i2_click = 0;
+		c6.i2_act = 0;
+		c6.i2_ia2 = 1;
+		c6.int_polarity = 0;
 		(void)lis2dh12_pin_int2_config_set(ctx, &c6);
 	}
 	(void)lis2dh12_int2_pin_notification_mode_set(ctx, LIS2DH12_INT2_LATCHED);
 }
 
-static void sensor_set_power_mode(stmdev_ctx_t *ctx, uint8_t low_power)
+static void sensor_config_int1_int2(stmdev_ctx_t *ctx)
 {
-	if (low_power) {
-		if (!s_sensor_low_power_mode) {
-			(void)lis2dh12_config_set_mode(ctx, LIS2DH12_MODE_LOW_POWER, LIS2DH12_ODR_10Hz);
-			s_sensor_low_power_mode = 1U;
-			DBG_PRINTF("LIS2DH12 -> LOW_POWER @10Hz\n");
-		}
-	} else {
-		if (s_sensor_low_power_mode) {
-			(void)lis2dh12_config_set_mode(ctx, LIS2DH12_MODE_HIGH_RESOLUTION, LIS2DH12_ODR_100Hz);
-			s_sensor_low_power_mode = 0U;
-			DBG_PRINTF("LIS2DH12 -> HIGH_RESOLUTION @100Hz\n");
-		}
+	/* INT1: FIFO stream + watermark/overrun as GPIO input poll source. */
+	(void)lis2dh12_config_fifo_enable(ctx, 1);
+	(void)lis2dh12_config_fifo_set_mode(ctx, LIS2DH12_FIFO_STREAM);
+	(void)lis2dh12_config_fifo_int1(ctx, 1, 1);
+	sensor_set_fifo_watermark(ctx, true);
+	/* INT2: 6D orientation interrupt (EXTI). */
+	sensor_config_int2_6d(ctx);
+}
+
+static void sensor_apply_chip_mode(stmdev_ctx_t *ctx, bool high_perf)
+{
+	if (high_perf == s_chip_high_perf)
+		return;
+	if (high_perf)
+		(void)lis2dh12_config_set_mode(ctx, LIS2DH12_MODE_HIGH_RESOLUTION,
+					       LIS2DH12_ODR_100Hz);
+	else
+		(void)lis2dh12_config_set_mode(ctx, LIS2DH12_MODE_LOW_POWER,
+					       LIS2DH12_ODR_10Hz);
+	s_chip_high_perf = high_perf;
+	sensor_set_fifo_watermark(ctx, high_perf);
+	vTaskDelay(pdMS_TO_TICKS(lis2dh12_config_settling_ms(
+	    high_perf ? LIS2DH12_ODR_100Hz : LIS2DH12_ODR_10Hz)));
+}
+
+static void sensor_fifo_drain_and_update(stmdev_ctx_t *ctx)
+{
+	int16_t fifo_raw[SENSOR_FIFO_MAX_SAMPLES * 3];
+	const int count = lis2dh12_config_fifo_batch_read(ctx, fifo_raw, SENSOR_FIFO_MAX_SAMPLES);
+	if (count <= 0) {
+		return;
+	}
+
+	int16_t off_x = 0, off_y = 0, off_z = 0;
+	lis2dh12_get_calib_offset(&off_x, &off_y, &off_z);
+
+	for (int i = 0; i < count; i++) {
+		const int16_t rx = (int16_t)(fifo_raw[i * 3 + 0] - off_x);
+		const int16_t ry = (int16_t)(fifo_raw[i * 3 + 1] - off_y);
+		const int16_t rz = (int16_t)(fifo_raw[i * 3 + 2] - off_z);
+		const float ax_mg = s_chip_high_perf ? LIS2DH12_FROM_FS_2g_HR_TO_mg(rx)
+						     : LIS2DH12_FROM_FS_2g_LP_TO_mg(rx);
+		const float ay_mg = s_chip_high_perf ? LIS2DH12_FROM_FS_2g_HR_TO_mg(ry)
+						     : LIS2DH12_FROM_FS_2g_LP_TO_mg(ry);
+		const float az_mg = s_chip_high_perf ? LIS2DH12_FROM_FS_2g_HR_TO_mg(rz)
+						     : LIS2DH12_FROM_FS_2g_LP_TO_mg(rz);
+		sensor_update_attitude(ax_mg, ay_mg, az_mg);
 	}
 }
 
-static void sensor_handle_int1_orientation(stmdev_ctx_t *ctx)
+static void sensor_handle_int2_orientation(stmdev_ctx_t *ctx)
 {
-	lis2dh12_int1_src_t src;
-	if (lis2dh12_int1_gen_source_get(ctx, &src) != 0) {
+	lis2dh12_int2_src_t src;
+	if (lis2dh12_int2_gen_source_get(ctx, &src) != 0) {
 		return;
 	}
 	if (src.ia) {
@@ -177,6 +203,7 @@ static void sensor_update_attitude(float ax_mg, float ay_mg, float az_mg)
 	s_att.rotating = (roll_rate_dps > ROTATION_RATE_THRESHOLD_DPS) ||
 	                 (pitch_rate_dps > ROTATION_RATE_THRESHOLD_DPS) ||
 	                 (dyn_acc > ROTATION_DYNACC_THRESHOLD_MG);
+
 }
 
 uint8_t sensor_init(uint16_t *ADC_Value, ADC_HandleTypeDef adc)
@@ -209,101 +236,61 @@ void sensor_task(void *arg)
 	stmdev_ctx_t *ctx = lis2dh12_get_ctx();
 	/* LIS2DH12 初始化并加载 EEPROM 中保存的零 g 校准（若有） */
 	lis2dh12_init();
+	s_chip_high_perf = false;
+	sensor_apply_chip_mode(ctx, true);
 	sensor_config_int1_int2(ctx);
-	storage_eeprom_init();
 	lis2dh12_calib_t cal;
 	if (storage_load_lis2dh12_calib(&cal))
 		lis2dh12_set_calib_offset(cal.offset_x, cal.offset_y, cal.offset_z);
 
 	uint32_t last_poll_ms = HAL_GetTick();
-	uint32_t last_activity_ms = last_poll_ms;
-	uint32_t int2_ignore_until_ms = 0U;
-	uint8_t continuous_mode = 0U;
-	s_sensor_low_power_mode = 0U;
-	s_int1_last_level = (uint8_t)HAL_GPIO_ReadPin(lis2dh12_INT1_GPIO_Port, lis2dh12_INT1_Pin);
+	s_last_motion_ms = HAL_GetTick();
 	for (;;) {
-		if (power_key_shutdown_active()) {
-			vTaskDelay(pdMS_TO_TICKS(20));
-			continue;
-		}
 		const uint32_t now_ms = HAL_GetTick();
-		const uint32_t sample_interval_ms = continuous_mode ? SENSOR_ACTIVE_SAMPLE_MS : SENSOR_IDLE_SAMPLE_MS;
+
+		const uint32_t sample_interval_ms =
+		    s_chip_high_perf ? SENSOR_ACTIVE_SAMPLE_MS : SENSOR_IDLE_SAMPLE_MS;
 		const bool sample_due = (now_ms - last_poll_ms) >= sample_interval_ms;
 		bool do_sample = false;
-		bool int2_event = false;
 
 		const uint8_t int1_level = (uint8_t)HAL_GPIO_ReadPin(lis2dh12_INT1_GPIO_Port, lis2dh12_INT1_Pin);
-		if (int1_level == (uint8_t)GPIO_PIN_SET && s_int1_last_level != (uint8_t)GPIO_PIN_SET) {
-			sensor_handle_int1_orientation(ctx);
-		}
-		s_int1_last_level = int1_level;
+		if (int1_level == (uint8_t)GPIO_PIN_SET)
+			s_fifo_irq_pending = 1U;
 
 		if (s_motion_irq_pending) {
 			s_motion_irq_pending = 0U;
-			if (now_ms < int2_ignore_until_ms) {
-				/* Ignore short glitch right after mode switch; still clear latched source. */
-				lis2dh12_int2_src_t int2_src;
-				(void)lis2dh12_int2_gen_source_get(ctx, &int2_src);
-			} else {
-				int2_event = true;
-				last_activity_ms = now_ms;
-				if (!continuous_mode) {
-					DBG_PRINTF("INT2 activity event -> continuous attitude ON\n");
-				}
-				continuous_mode = 1U;
-				sensor_set_power_mode(ctx, 0U);
-				do_sample = true;
-			}
+			sensor_handle_int2_orientation(ctx);
+			s_last_motion_ms = now_ms;
+			sensor_apply_chip_mode(ctx, true);
+			do_sample = true;
+		} else if (s_fifo_irq_pending) {
+			s_fifo_irq_pending = 0U;
+			do_sample = true;
 		} else if (sample_due) {
 			do_sample = true;
 		}
 
 		if (do_sample) {
 			last_poll_ms = now_ms;
-			if (int2_event) {
-				/* Read INT2 source to clear latched INT2 and avoid missed retrigger. */
-				lis2dh12_int2_src_t int2_src;
-				(void)lis2dh12_int2_gen_source_get(ctx, &int2_src);
-			}
-			lis2dh12_read_data(ctx);
-			float ax_mg, ay_mg, az_mg;
-			if (lis2dh12_get_last_accel_mg(&ax_mg, &ay_mg, &az_mg)) {
-				sensor_update_attitude(ax_mg, ay_mg, az_mg);
-				if (s_att.rotating) {
-					last_activity_ms = now_ms;
-					/* Fallback wake-up path: if INT2 misses, motion estimate can still re-enable
-					 * continuous/high-performance mode from periodic samples. */
-					if (!continuous_mode) {
-						continuous_mode = 1U;
-						sensor_set_power_mode(ctx, 0U);
-						DBG_PRINTF("motion detected in sample -> continuous attitude ON\n");
-					}
-				}
-				const int32_t roll_mdeg = (int32_t)(s_att.roll_deg * 1000.0f);
-				const int32_t pitch_mdeg = (int32_t)(s_att.pitch_deg * 1000.0f);
-				const int32_t roll_abs_mdeg = (roll_mdeg < 0) ? -roll_mdeg : roll_mdeg;
-				const int32_t pitch_abs_mdeg = (pitch_mdeg < 0) ? -pitch_mdeg : pitch_mdeg;
-				DBG_PRINTF("attitude roll/pitch=%s%ld.%03ld/%s%ld.%03ld deg, rotating=%d, dir=%s\n",
-				           (roll_mdeg < 0) ? "-" : "",
-				           (long)(roll_abs_mdeg / 1000),
-				           (long)(roll_abs_mdeg % 1000),
-				           (pitch_mdeg < 0) ? "-" : "",
-				           (long)(pitch_abs_mdeg / 1000),
-				           (long)(pitch_abs_mdeg % 1000),
-				           s_att.rotating ? 1 : 0,
-				           sensor_rotation_direction_str());
-			}
+			sensor_fifo_drain_and_update(ctx);
+			/* if (s_att_valid) {
+				const int roll_x10 = (int)(s_att.roll_deg * 10.0f);
+				const int pitch_x10 = (int)(s_att.pitch_deg * 10.0f);
+				const int roll_dec = (roll_x10 < 0) ? -(roll_x10 % 10) : (roll_x10 % 10);
+				const int pitch_dec = (pitch_x10 < 0) ? -(pitch_x10 % 10) : (pitch_x10 % 10);
+				DBG_PRINTF("[att] roll=%d.%d pitch=%d.%d rot=%d\n",
+					   roll_x10 / 10, roll_dec,
+					   pitch_x10 / 10, pitch_dec,
+					   s_att.rotating ? 1 : 0);
+			} */
+			if (s_att.rotating)
+				s_last_motion_ms = now_ms;
 		}
-		if (continuous_mode && (now_ms - last_activity_ms >= SENSOR_INACTIVITY_TIMEOUT_MS)) {
-			continuous_mode = 0U;
-			sensor_set_power_mode(ctx, 1U);
-			int2_ignore_until_ms = now_ms + INT2_WAKE_GUARD_MS;
-			/* Clear possible latched stale INT2 status during LP transition. */
-			lis2dh12_int2_src_t int2_src;
-			(void)lis2dh12_int2_gen_source_get(ctx, &int2_src);
-			DBG_PRINTF("inactivity >5s -> increase sample interval to %lums\n",
-			           (unsigned long)SENSOR_IDLE_SAMPLE_MS);
-		}
+
+		if (s_chip_high_perf &&
+		    (uint32_t)(now_ms - s_last_motion_ms) >= SENSOR_IDLE_TIMEOUT_MS)
+			sensor_apply_chip_mode(ctx, false);
+
 		vTaskDelay(pdMS_TO_TICKS(10));
 	}
 }
@@ -324,7 +311,6 @@ void sensor_lis2dh12_calibrate_and_save(void)
 		.offset_z = 0,
 	};
 	lis2dh12_get_calib_offset(&cal.offset_x, &cal.offset_y, &cal.offset_z);
-	storage_eeprom_init();
 	storage_save_lis2dh12_calib(&cal);
 }
 

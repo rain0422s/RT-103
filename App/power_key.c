@@ -1,10 +1,10 @@
 #include "power_key.h"
 #include "led_control.h"
 #include "key.h"
-#include "lfs_port.h"
 #include "storage.h"
 #include "gpio.h"
 #include "sensor.h"
+#include "display.h"
 #include "FreeRTOS.h"
 #include "task.h"
 #include "event_groups.h"
@@ -24,9 +24,37 @@ static EventGroupHandle_t power_key_evgrp = NULL;
 static TimerHandle_t xLedTimer = NULL;
 /* Enter true immediately on power-key IRQ; cleared if shutdown is canceled. */
 static volatile bool s_shutdown_active = false;
+static bool s_periodic_tasks_suspended;
+
+extern TaskHandle_t V_handle_task_DeviceStart; /* sensor_task handle */
+extern TaskHandle_t V_handle_task_IdleLED;     /* gesture_task handle */
 
 static void power_key_task(void *arg);
 static void vTimerCallback(TimerHandle_t xTimer);
+static void suspend_periodic_tasks(void);
+static void resume_periodic_tasks(void);
+
+static void suspend_periodic_tasks(void)
+{
+	if (s_periodic_tasks_suspended)
+		return;
+	if (V_handle_task_DeviceStart)
+		vTaskSuspend(V_handle_task_DeviceStart);
+	if (V_handle_task_IdleLED)
+		vTaskSuspend(V_handle_task_IdleLED);
+	s_periodic_tasks_suspended = true;
+}
+
+static void resume_periodic_tasks(void)
+{
+	if (!s_periodic_tasks_suspended)
+		return;
+	if (V_handle_task_DeviceStart)
+		vTaskResume(V_handle_task_DeviceStart);
+	if (V_handle_task_IdleLED)
+		vTaskResume(V_handle_task_IdleLED);
+	s_periodic_tasks_suspended = false;
+}
 
 static void power_key_task(void *arg)
 {
@@ -45,6 +73,8 @@ static void power_key_task(void *arg)
 					     pdTRUE, pdFALSE, portMAX_DELAY);
 		if ((r_event & POWER_KEY_EVENT) == 0)
 			continue;
+		const uint32_t press_start_ms = HAL_GetTick();
+		display_show_shutdown_prompt(true, false, 0);
 
 		xEventGroupClearBits(power_key_evgrp, POWER_KEY_2S_ELAPSED);
 		if (xTimerReset(xLedTimer, 0) != pdPASS) {
@@ -52,11 +82,15 @@ static void power_key_task(void *arg)
 			s_shutdown_active = false;
 			continue;
 		}
+		suspend_periodic_tasks();
 
 		/* 等：按键松开 或 2s 到（由定时器回调置位） */
 		for (;;) {
 			r_event = xEventGroupWaitBits(power_key_evgrp,
 				POWER_KEY_2S_ELAPSED, pdFALSE, pdFALSE, pdMS_TO_TICKS(10));
+			const uint32_t elapsed_ms = HAL_GetTick() - press_start_ms;
+			const uint8_t progress_pct = (elapsed_ms >= 2000u) ? 100u : (uint8_t)((elapsed_ms * 100u) / 2000u);
+			display_show_shutdown_prompt(true, false, progress_pct);
 			if ((r_event & POWER_KEY_2S_ELAPSED) != 0)
 				break;
 			if (power_key_is_released())
@@ -66,20 +100,25 @@ static void power_key_task(void *arg)
 		(void)xTimerStop(xLedTimer, 0);
 
 		if ((xEventGroupGetBits(power_key_evgrp) & POWER_KEY_2S_ELAPSED) != 0) {
+			display_show_shutdown_prompt(true, false, 100);
 			led_control_send(LED_CMD_ALL_OFF);
 			buttonState = IDLE_STATE;
 			if (button_scan(true, &buttonState) == SHORT_PRESS_STATE) {
-				if (storage_flash_is_present())
-					lfs_unmount_fs();
+				display_show_shutdown_prompt(true, true, 100);
+				storage_prepare_shutdown();
 				led_control_send(LED_CMD_BLINK_4S);
 				vTaskDelay(pdMS_TO_TICKS(4000));
 				PowerDown;
 			} else {
+				display_show_shutdown_prompt(false, false, 0);
 				led_control_send(LED_CMD_BREATH_ON);
+				resume_periodic_tasks();
 				s_shutdown_active = false;
 			}
 		} else {
 			/* Released before 2s, cancel shutdown flow and resume tasks. */
+			display_show_shutdown_prompt(false, false, 0);
+			resume_periodic_tasks();
 			s_shutdown_active = false;
 		}
 	}
@@ -127,7 +166,6 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 		return;
 	}
 
-	if (GPIO_Pin == lis2dh12_INT2_Pin) {
+	if (GPIO_Pin == lis2dh12_INT2_Pin)
 		sensor_notify_motion_irq();
-	}
 }

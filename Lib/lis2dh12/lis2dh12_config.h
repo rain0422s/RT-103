@@ -111,6 +111,13 @@ int lis2dh12_config_int1_click(stmdev_ctx_t *ctx,
                                uint8_t ths, uint8_t time_limit,
                                uint8_t latency, uint8_t window);
 
+/** 单击/双击映射到 INT2（CTRL_REG6 i2_click）；关闭 INT1 上的 click 路由。 */
+int lis2dh12_config_int2_click(stmdev_ctx_t *ctx,
+                               uint8_t xs, uint8_t xd, uint8_t ys, uint8_t yd,
+                               uint8_t zs, uint8_t zd,
+                               uint8_t ths, uint8_t time_limit,
+                               uint8_t latency, uint8_t window);
+
 /** 清除 INT1 源（读 INT1_SRC）并可选清除 Click 源（读 CLICK_SRC）。 */
 void lis2dh12_config_int1_clear_source(stmdev_ctx_t *ctx);
 

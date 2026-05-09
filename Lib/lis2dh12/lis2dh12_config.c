@@ -200,6 +200,36 @@ int lis2dh12_config_int1_click(stmdev_ctx_t *ctx,
     return (int)lis2dh12_pin_int1_config_set(ctx, &c3);
 }
 
+int lis2dh12_config_int2_click(stmdev_ctx_t *ctx,
+                               uint8_t xs, uint8_t xd, uint8_t ys, uint8_t yd,
+                               uint8_t zs, uint8_t zd,
+                               uint8_t ths, uint8_t time_limit,
+                               uint8_t latency, uint8_t window)
+{
+    if (!ctx) return -1;
+    lis2dh12_click_cfg_t cfg = { 0 };
+    cfg.xs = xs; cfg.xd = xd;
+    cfg.ys = ys; cfg.yd = yd;
+    cfg.zs = zs; cfg.zd = zd;
+    if (lis2dh12_tap_conf_set(ctx, &cfg) != 0) return -1;
+    lis2dh12_tap_threshold_set(ctx, ths & 0x7F);
+    lis2dh12_shock_dur_set(ctx, time_limit);
+    lis2dh12_quiet_dur_set(ctx, latency);
+    lis2dh12_double_tap_timeout_set(ctx, window);
+    lis2dh12_ctrl_reg3_t c3;
+    if (lis2dh12_pin_int1_config_get(ctx, &c3) != 0) return -1;
+    c3.i1_click = 0;
+    if (lis2dh12_pin_int1_config_set(ctx, &c3) != 0) return -1;
+    lis2dh12_ctrl_reg6_t c6;
+    if (lis2dh12_pin_int2_config_get(ctx, &c6) != 0) return -1;
+    c6.i2_click = 1;
+    c6.i2_act = 0;
+    c6.int_polarity = 0;
+    if (lis2dh12_pin_int2_config_set(ctx, &c6) != 0) return -1;
+    (void)lis2dh12_tap_notification_mode_set(ctx, LIS2DH12_TAP_LATCHED);
+    return 0;
+}
+
 void lis2dh12_config_int1_clear_source(stmdev_ctx_t *ctx)
 {
     if (!ctx) return;

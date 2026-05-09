@@ -35,6 +35,6 @@ typedef enum {
 bool sensor_get_attitude(sensor_attitude_t *out);
 /** Get latest 6D orientation direction (updated on INT1 event). */
 sensor_6d_dir_t sensor_get_6d_dir(void);
-/** Notify sensor task that motion interrupt has occurred (called from ISR). */
+/** Notify sensor task: LIS2DH12 INT2 click IRQ (called from ISR). */
 void sensor_notify_motion_irq(void);
 #endif
