@@ -8,6 +8,7 @@
 #include "gesture.h"
 #include "lfs_port.h"
 #include "ui_menu_registry.h"
+#include "task.h"
 
 extern const uint8_t u8g2_font_6x12_tf[];
 
@@ -60,6 +61,26 @@ static short abs_s(short i)
         return (i < 0) ? (short)(~(i - 1)) : i;
 }
 
+void display_wait_double_click_exit(void)
+{
+        for (;;) {
+                gesture_key_event_t evt = GESTURE_KEY_NONE;
+                while (gesture_key_event_get(&evt)) {
+                        if (evt == GESTURE_KEY_DOUBLE_CLICK)
+                                return;
+                }
+                delay_ms(20);
+        }
+}
+
+void display_show_view_until_double_click(u8g2_t *pu8g2, display_draw_once_fn_t draw_once)
+{
+        if (pu8g2 == NULL || draw_once == NULL)
+                return;
+        draw_once(pu8g2);
+        display_wait_double_click_exit();
+}
+
 void display_show_text_feedback(u8g2_t *pu8g2, const char *line1, const char *line2, uint16_t hold_ms)
 {
         if (pu8g2 == NULL)
@@ -70,6 +91,10 @@ void display_show_text_feedback(u8g2_t *pu8g2, const char *line1, const char *li
         if (line2 != NULL)
                 u8g2_DrawStr(pu8g2, 8, 44, line2);
         u8g2_SendBuffer(pu8g2);
+        if (hold_ms == 0U) {
+                display_wait_double_click_exit();
+                return;
+        }
         delay_ms(hold_ms);
 }
 
@@ -132,7 +157,7 @@ static void key_scan(void)
 {
         gesture_key_event_t evt = GESTURE_KEY_NONE;
         while (gesture_key_event_get(&evt)) {
-                if (evt == GESTURE_KEY_SINGLE_CLICK || evt == GESTURE_KEY_DOUBLE_CLICK || evt == GESTURE_KEY_LONG_PRESS) {
+                if (evt == GESTURE_KEY_SINGLE_CLICK || evt == GESTURE_KEY_LONG_PRESS) {
                         key_msg.id = 0;
                         key_msg.press = (evt != GESTURE_KEY_LONG_PRESS);
                         key_msg.long_press = (evt == GESTURE_KEY_LONG_PRESS);
@@ -381,7 +406,15 @@ void ui_test(u8g2_t *pu8g2)
 void ui_task(void *arg)
 {
         int list_len;
-        int8_t init_sel = (int8_t)(intptr_t)arg;
+        uint32_t stack_log_tick_ms = HAL_GetTick();
+        int8_t init_sel = 0;
+        eeprom_config_t eeprom_cfg;
+        (void)arg;
+
+        storage_eeprom_init();
+        if (storage_load_config(&eeprom_cfg)) {
+                init_sel = eeprom_cfg.ui_select;
+        }
 
         if (!s_menu_defaults_registered) {
                 ui_menu_registry_register_all(ui_menu_register);
@@ -411,6 +444,8 @@ void ui_task(void *arg)
                 oled_boot_splash_show(&u8g2);
                 delay_ms(200);
         }
+        DBG_PRINTF("[ui_task] stack watermark=%lu words\n",
+                   (unsigned long)uxTaskGetStackHighWaterMark(NULL));
         for (;;) {
                 if (s_shutdown_prompt_show) {
                         const uint8_t pct = s_shutdown_prompt_progress_pct;
@@ -428,6 +463,11 @@ void ui_task(void *arg)
                         continue;
                 }
                 const bool active = loop1(&u8g2);
+                if ((uint32_t)(HAL_GetTick() - stack_log_tick_ms) >= 5000U) {
+                        stack_log_tick_ms = HAL_GetTick();
+                        DBG_PRINTF("[ui_task] stack watermark=%lu words\n",
+                                   (unsigned long)uxTaskGetStackHighWaterMark(NULL));
+                }
                 /* Lower refresh load while keeping responsive interaction. */
                 delay_ms(active ? 10 : 100);
         }

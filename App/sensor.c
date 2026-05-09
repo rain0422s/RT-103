@@ -36,6 +36,8 @@ static uint8_t s_fifo_irq_pending;
 static volatile sensor_6d_dir_t s_6d_dir = SENSOR_6D_DIR_UNKNOWN;
 static bool s_chip_high_perf;
 static uint32_t s_last_motion_ms;
+static bool sensor_measure_accel_avg_mg(stmdev_ctx_t *ctx, uint16_t samples,
+					float *ax_mg, float *ay_mg, float *az_mg);
 
 static void sensor_update_attitude(float ax_mg, float ay_mg, float az_mg);
 
@@ -206,6 +208,36 @@ static void sensor_update_attitude(float ax_mg, float ay_mg, float az_mg)
 
 }
 
+static bool sensor_measure_accel_avg_mg(stmdev_ctx_t *ctx, uint16_t samples,
+					float *ax_mg, float *ay_mg, float *az_mg)
+{
+	float sx = 0.0f, sy = 0.0f, sz = 0.0f;
+	uint16_t ok = 0;
+
+	if (!ctx || !ax_mg || !ay_mg || !az_mg || samples == 0U)
+		return false;
+
+	for (uint16_t i = 0; i < samples; i++) {
+		float x = 0.0f, y = 0.0f, z = 0.0f;
+		lis2dh12_read_data(ctx);
+		if (lis2dh12_get_last_accel_mg(&x, &y, &z)) {
+			sx += x;
+			sy += y;
+			sz += z;
+			ok++;
+		}
+		vTaskDelay(pdMS_TO_TICKS(5));
+	}
+
+	if (ok == 0U)
+		return false;
+
+	*ax_mg = sx / (float)ok;
+	*ay_mg = sy / (float)ok;
+	*az_mg = sz / (float)ok;
+	return true;
+}
+
 uint8_t sensor_init(uint16_t *ADC_Value, ADC_HandleTypeDef adc)
 {
 	HAL_ADCEx_Calibration_Start(&adc);
@@ -299,11 +331,29 @@ void sensor_task(void *arg)
  * 执行一次 LIS2DH12 零 g 校准，并将 s_calib_offset 保存到 EEPROM。
  * 调用前传感器需静止、Z 轴向上。可由 UI 菜单项或调试命令触发。
  */
-void sensor_lis2dh12_calibrate_and_save(void)
+bool sensor_lis2dh12_calibrate_and_save(void)
 {
+	int16_t before_x = 0, before_y = 0, before_z = 0;
+	float pre_ax = 0.0f, pre_ay = 0.0f, pre_az = 0.0f;
+	float post_ax = 0.0f, post_ay = 0.0f, post_az = 0.0f;
+	float pre_err_mg = -1.0f, post_err_mg = -1.0f;
 	stmdev_ctx_t *ctx = lis2dh12_get_ctx();
-	if (lis2dh12_calibrate(ctx) != 0)
-		return;
+
+	lis2dh12_get_calib_offset(&before_x, &before_y, &before_z);
+	DBG_PRINTF("[calib] before: x=%d y=%d z=%d\n", before_x, before_y, before_z);
+	if (sensor_measure_accel_avg_mg(ctx, 24, &pre_ax, &pre_ay, &pre_az)) {
+		const float pre_target_z = (pre_az >= 0.0f) ? 1000.0f : -1000.0f;
+		const float pre_err = sqrtf(pre_ax * pre_ax + pre_ay * pre_ay +
+					    (pre_az - pre_target_z) * (pre_az - pre_target_z));
+		pre_err_mg = pre_err;
+		DBG_PRINTF("[calib] pre_avg[mg]: x=%d y=%d z=%d | target_z=%d | err=%dmg\n",
+			   (int)pre_ax, (int)pre_ay, (int)pre_az,
+			   (int)pre_target_z, (int)pre_err);
+	}
+	if (lis2dh12_calibrate(ctx) != 0) {
+		DBG_PRINTF("[calib] failed: lis2dh12_calibrate() error\n");
+		return false;
+	}
 	lis2dh12_calib_t cal = {
 		.magic   = EEPROM_CALIB_MAGIC,
 		.offset_x = 0,
@@ -311,7 +361,36 @@ void sensor_lis2dh12_calibrate_and_save(void)
 		.offset_z = 0,
 	};
 	lis2dh12_get_calib_offset(&cal.offset_x, &cal.offset_y, &cal.offset_z);
-	storage_save_lis2dh12_calib(&cal);
+	DBG_PRINTF("[calib] after : x=%d y=%d z=%d | delta: dx=%d dy=%d dz=%d\n",
+		   cal.offset_x, cal.offset_y, cal.offset_z,
+		   (int16_t)(cal.offset_x - before_x),
+		   (int16_t)(cal.offset_y - before_y),
+		   (int16_t)(cal.offset_z - before_z));
+	if (!storage_save_lis2dh12_calib(&cal)) {
+		DBG_PRINTF("[calib] failed: save EEPROM error\n");
+		return false;
+	}
+	if (sensor_measure_accel_avg_mg(ctx, 24, &post_ax, &post_ay, &post_az)) {
+		const float post_target_z = (post_az >= 0.0f) ? 1000.0f : -1000.0f;
+		const float post_err = sqrtf(post_ax * post_ax + post_ay * post_ay +
+					     (post_az - post_target_z) * (post_az - post_target_z));
+		post_err_mg = post_err;
+		DBG_PRINTF("[calib] post_avg[mg]: x=%d y=%d z=%d | target_z=%d | err=%dmg\n",
+			   (int)post_ax, (int)post_ay, (int)post_az,
+			   (int)post_target_z, (int)post_err);
+	}
+	if (pre_err_mg >= 0.0f && post_err_mg >= 0.0f) {
+		if (pre_err_mg > 0.01f) {
+			const float improve_pct = ((pre_err_mg - post_err_mg) / pre_err_mg) * 100.0f;
+			DBG_PRINTF("[calib] improvement: %d%% (%dmg -> %dmg)\n",
+				   (int)improve_pct, (int)pre_err_mg, (int)post_err_mg);
+		} else {
+			DBG_PRINTF("[calib] improvement: baseline near zero (%dmg -> %dmg)\n",
+				   (int)pre_err_mg, (int)post_err_mg);
+		}
+	}
+	DBG_PRINTF("[calib] success: saved to EEPROM\n");
+	return true;
 }
 
 bool sensor_get_attitude(sensor_attitude_t *out)

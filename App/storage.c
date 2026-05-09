@@ -96,9 +96,9 @@ bool storage_get_boot_count(uint32_t *out_boot_count)
 	return true;
 }
 
-void storage_run_lis2dh12_calibration_save(void)
+bool storage_run_lis2dh12_calibration_save(void)
 {
-	sensor_lis2dh12_calibrate_and_save();
+	return sensor_lis2dh12_calibrate_and_save();
 }
 
 void storage_menu_action_show_boot_count(u8g2_t *pu8g2)
@@ -109,21 +109,23 @@ void storage_menu_action_show_boot_count(u8g2_t *pu8g2)
 	if (storage_get_boot_count(&boot_count)) {
 		(void)snprintf(line, sizeof(line), "boot:%lu", (unsigned long)boot_count);
 	}
-	display_show_text_feedback(pu8g2, "Boot Count", line, 900);
+	display_show_text_feedback(pu8g2, "Boot Count", line, 0);
 }
 
 void storage_menu_action_run_calibration(u8g2_t *pu8g2)
 {
-	storage_run_lis2dh12_calibration_save();
-	display_show_text_feedback(pu8g2, "Calibration", "Saved to EEPROM", 700);
+	if (storage_run_lis2dh12_calibration_save())
+		display_show_text_feedback(pu8g2, "Calibration", "Saved to EEPROM", 0);
+	else
+		display_show_text_feedback(pu8g2, "Calibration", "Failed", 0);
 }
 
 void storage_menu_register_items(storage_menu_register_fn_t reg_fn)
 {
 	if (reg_fn == NULL)
 		return;
-	(void)reg_fn("ab", storage_menu_action_show_boot_count);
-	(void)reg_fn("cal", storage_menu_action_run_calibration);
+	(void)reg_fn("boot", storage_menu_action_show_boot_count);
+	(void)reg_fn("calib", storage_menu_action_run_calibration);
 }
 
 /** EEPROM test: backup one small block in the stats area, write a pattern, verify, then restore backup. */
@@ -213,22 +215,14 @@ void storage_prepare_shutdown(void)
 
 void storage_init_task(void *arg)
 {
-	static bool s_menu_items_registered;
+
 	(void)arg;
 
-	if (!s_menu_items_registered) {
-		storage_menu_register_items(display_menu_register_item);
-		s_menu_items_registered = true;
-	}
-
-
-
+	storage_eeprom_init();   /* init bus + detect M24C02; if not present, load/save APIs return false */
 	/* Mount flash FS ASAP so UI can enter system quickly and read boot_count. */
 	storage_flash_init();   /* reset + read_id; if present (0xEF), allow LittleFS */
 	if (storage_flash_is_present())
 		lfs_first_run();
-
-	storage_eeprom_init();   /* init bus + detect M24C02; if not present, load/save APIs return false */
 	// storage_eeprom_test();
 	for (;;) {
 		vTaskDelay(pdMS_TO_TICKS(1000));

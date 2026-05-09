@@ -203,21 +203,16 @@ static void Creator(void)
         uart_dma_init();
 
         BaseType_t ok = pdPASS;
-#ifdef U8G2_ENABLED
-        storage_eeprom_init();
-        eeprom_config_t eeprom_cfg;
-        if (!storage_load_config(&eeprom_cfg))
-                eeprom_cfg.ui_select = 0;
-        if (xTaskCreate((TaskFunction_t)ui_task, "ui_task", 128,
-                        (void *)(intptr_t)eeprom_cfg.ui_select, 5, NULL) != pdPASS) {
-                DBG_PRINTF("[Creator] ui_task create failed\n");
-                ok = pdFALSE;
-        }
-#endif
         if (xTaskCreate((TaskFunction_t)storage_init_task, "storage_init", 512, NULL, 6, NULL) != pdPASS) {
                 DBG_PRINTF("[Creator] storage_init_task create failed\n");
                 ok = pdFALSE;
         }
+#ifdef U8G2_ENABLED
+        if (xTaskCreate((TaskFunction_t)ui_task, "ui_task", 384, NULL, 5, NULL) != pdPASS) {
+                DBG_PRINTF("[Creator] ui_task create failed\n");
+                ok = pdFALSE;
+        }
+#endif
         if (xTaskCreate((TaskFunction_t)sensor_task, "sensor_task", 256, NULL, 3,
                         (TaskHandle_t *)&V_handle_task_DeviceStart) != pdPASS) {
                 DBG_PRINTF("[Creator] sensor_task create failed\n");

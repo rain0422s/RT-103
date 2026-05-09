@@ -37,7 +37,7 @@ bool storage_save_lis2dh12_calib(const lis2dh12_calib_t *cal);
 /** Read boot counter from mounted LittleFS. Returns false if FS not mounted. */
 bool storage_get_boot_count(uint32_t *out_boot_count);
 /** Run LIS2DH12 calibration and save to EEPROM through sensor path. */
-void storage_run_lis2dh12_calibration_save(void);
+bool storage_run_lis2dh12_calibration_save(void);
 /** Storage-backed UI long-press action: show boot counter. */
 void storage_menu_action_show_boot_count(u8g2_t *pu8g2);
 /** Storage-backed UI long-press action: run calibration and save. */

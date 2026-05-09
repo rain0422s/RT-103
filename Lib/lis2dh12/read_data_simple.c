@@ -418,6 +418,7 @@ uint8_t lis2dh12_calibrate(stmdev_ctx_t *dev_ctx)
 {
         int32_t sum[3] = { 0, 0, 0 };
         uint16_t n;
+        const int32_t one_g_raw = ((int32_t)LIS2DH12_2G_HR_1G_LSB << 4);
         if (!dev_ctx) return 1;
         for (n = 0; n < LIS2DH12_CALIB_SAMPLES; n++) {
                 int16_t raw[3];
@@ -429,7 +430,11 @@ uint8_t lis2dh12_calibrate(stmdev_ctx_t *dev_ctx)
         }
         s_calib_offset[0] = (int16_t)(sum[0] / (int32_t)LIS2DH12_CALIB_SAMPLES);
         s_calib_offset[1] = (int16_t)(sum[1] / (int32_t)LIS2DH12_CALIB_SAMPLES);
-        s_calib_offset[2] = (int16_t)(sum[2] / (int32_t)LIS2DH12_CALIB_SAMPLES) - LIS2DH12_2G_HR_1G_LSB;
+        {
+                const int32_t avg_z = (sum[2] / (int32_t)LIS2DH12_CALIB_SAMPLES);
+                const int32_t target_z = (avg_z >= 0) ? one_g_raw : -one_g_raw;
+                s_calib_offset[2] = (int16_t)(avg_z - target_z);
+        }
         return 0;
 }
 
