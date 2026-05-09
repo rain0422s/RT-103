@@ -13,7 +13,7 @@ extern void vPortSetupTimerInterrupt(void);
 //     HAL_SYSTICK_Config(HAL_RCC_GetHCLKFreq() / 1000);
 // }
 
-static void os_delay_us(uint32_t nus)
+static inline __attribute__((unused)) void os_delay_us(uint32_t nus)
 {
         if (nus == 0u)
                 return;
@@ -105,21 +105,7 @@ static inline void dly_ms(uint32_t ms)
 // #define print_code(code) printf("[ " #code "]"), code
 #define print_code(code)  println("[ " #code "]"), code
 
-static void print_binary(uint8_t n)
-{
-    for (uint8_t i = 0x80; i > 0; i >>= 1)
-        printf("%c", n & i ? '1' : '0');
-}
-
-#if 1
-// #define INLINE #pragma inline
-// #define INLINE __inline
-// #define INLINE __forceinline
-#define INLINE __attribute__((always_inline))
-#else
-// #define INLINE
-#define INLINE inline
-#endif
+#define INLINE
 
 ///////////////////////////////////////////////// other
 
@@ -131,32 +117,5 @@ static void print_binary(uint8_t n)
 #define MEMBER_SIZE(structure, member)   (sizeof(((structure*)0)->member))
 
 #define swap_int(a, b)                   (a ^= b, b ^= a, a ^= b)  // a ^= b ^= a ^= b
-
-static uint8_t calc_crc(uint8_t arr[], uint8_t len)
-{
-    uint8_t i, j, byte, carry, crc = 0;
-#if 0
-    for (i = 0; i < len; ++i) {
-        byte = arr[i];
-        for (j = 8; j != 0; --j) {
-            carry = (crc ^ byte) & 0x80;
-            crc <<= 1;
-            if (carry) crc ^= 0x7;
-            byte <<= 1;
-        }
-    }
-#else
-    for (i = 0; i < len; ++i) {
-        byte = crc ^ arr[i];
-        for (j = 0; j < 8; ++j) {
-            carry = byte & 0x80;
-            byte <<= 1;
-            if (carry) byte ^= 0x7;
-        }
-        crc = byte;
-    }
-#endif
-    return crc;
-}
 
 #endif

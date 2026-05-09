@@ -242,6 +242,15 @@ exit:
     return ret;
 }
 
+struct i2c_drv swi2c_drv = {
+    (i2cdrv_init)soft_i2c_init,
+    (i2cdrv_check)soft_i2c_check,
+    (i2cdrv_recv)soft_i2c_receive,
+    (i2cdrv_send)soft_i2c_transmit,
+    (i2cdrv_read)soft_i2c_read_mem,
+    (i2cdrv_write)soft_i2c_write_mem,
+};
+
 #endif
 
 //===============================================================================//
@@ -279,6 +288,15 @@ INLINE bool hard_i2c_write_mem(hard_i2c_t* bus, uint16_t dev, uint16_t reg, uint
 {
     return HAL_I2C_Mem_Write(bus, dev, reg, ops & I2C_REG_16BIT ? I2C_MEMADD_SIZE_16BIT : I2C_MEMADD_SIZE_8BIT, dat, len, 0xFF) == HAL_OK;
 }
+
+struct i2c_drv hwi2c_drv = {
+    (i2cdrv_init)hard_i2c_init,
+    (i2cdrv_check)hard_i2c_check,
+    (i2cdrv_recv)hard_i2c_receive,
+    (i2cdrv_send)hard_i2c_transmit,
+    (i2cdrv_read)hard_i2c_read_mem,
+    (i2cdrv_write)hard_i2c_write_mem,
+};
 
 #endif
 
@@ -486,7 +504,6 @@ bool i2cdev_viewer(i2c_cli_t cli, uint16_t start, uint16_t end, uint8_t fmt)
             switch (fmt) {
                 default:
                 case UINT_FORMAT_BIN: {
-                    uint8_t i;
                     for (mask = 0x80; mask > 0; mask >>= 1)
                         printf("%c", dat & mask ? '1' : '0');
                     break;

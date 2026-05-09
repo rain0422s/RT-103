@@ -133,14 +133,7 @@ bool soft_i2c_write_mem(soft_i2c_t* bus, uint16_t dev, uint16_t reg, uint8_t* da
 
 */
 
-static struct i2c_drv swi2c_drv = {
-    (i2cdrv_init)soft_i2c_init,
-    (i2cdrv_check)soft_i2c_check,
-    (i2cdrv_recv)soft_i2c_receive,
-    (i2cdrv_send)soft_i2c_transmit,
-    (i2cdrv_read)soft_i2c_read_mem,
-    (i2cdrv_write)soft_i2c_write_mem,
-};
+extern struct i2c_drv swi2c_drv;
 
 #endif
 
@@ -155,14 +148,7 @@ bool hard_i2c_transmit(hard_i2c_t* bus, uint16_t dev, uint8_t* dat, uint16_t len
 bool hard_i2c_read_mem(hard_i2c_t* bus, uint16_t dev, uint16_t reg, uint8_t* dat, uint16_t len, i2c_ops_t ops);
 bool hard_i2c_write_mem(hard_i2c_t* bus, uint16_t dev, uint16_t reg, uint8_t* dat, uint16_t len, i2c_ops_t ops);
 
-static struct i2c_drv hwi2c_drv = {
-    (i2cdrv_init)hard_i2c_init,
-    (i2cdrv_check)hard_i2c_check,
-    (i2cdrv_recv)hard_i2c_receive,
-    (i2cdrv_send)hard_i2c_transmit,
-    (i2cdrv_read)hard_i2c_read_mem,
-    (i2cdrv_write)hard_i2c_write_mem,
-};
+extern struct i2c_drv hwi2c_drv;
 
 /*
 

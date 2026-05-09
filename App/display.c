@@ -8,7 +8,6 @@
 #include "gesture.h"
 #include "lfs_port.h"
 #include "ui_menu_registry.h"
-#include <string.h>
 
 extern const uint8_t u8g2_font_6x12_tf[];
 
@@ -23,7 +22,6 @@ typedef struct {
 
 typedef struct ui_menu_item {
         const char *str;
-        uint8_t len;
         void (*on_long_press)(u8g2_t *pu8g2);
         struct ui_menu_item *next;
 } ui_menu_item_t;
@@ -78,14 +76,11 @@ void display_show_text_feedback(u8g2_t *pu8g2, const char *line1, const char *li
 static bool ui_menu_register(const char *name, void (*on_long_press)(u8g2_t *pu8g2))
 {
         ui_menu_item_t *node;
-        size_t len;
 
         if (name == NULL || s_menu_node_count >= UI_MENU_MAX_ITEMS)
                 return false;
         node = &s_menu_nodes[s_menu_node_count];
         node->str = name;
-        len = strlen(name);
-        node->len = (len > 255u) ? 255u : (uint8_t)len;
         node->on_long_press = on_long_press;
         node->next = NULL;
 

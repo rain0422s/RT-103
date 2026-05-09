@@ -46,7 +46,9 @@ static int lfs_deskio_prog(const struct lfs_config *c, lfs_block_t block, lfs_of
  */
 static int lfs_deskio_erase(const struct lfs_config *c, lfs_block_t block)
 {
-        DBG_PRINTF("block:%d,i:%d",block,(OFFSETBLOCK+block)*c->block_size);
+        DBG_PRINTF("block:%lu,i:%lu",
+                   (unsigned long)block,
+                   (unsigned long)((OFFSETBLOCK + block) * c->block_size));
 	if(W25Qx_OK == w25qxx_erase_block((OFFSETBLOCK+block)*c->block_size))
 	// int ret = w25qxx_erase_block((OFFSETBLOCK+block));
                 return LFS_ERR_OK;
@@ -116,7 +118,9 @@ int bytes_to_mb(uint32_t bytes) {
         uint32_t mb = mb_x1000 / 1000;
         uint32_t mb_frac = mb_x1000 % 1000;
 
-        DBG_PRINTF("Converted to: %u.%03u MB\n", mb, mb_frac);
+        DBG_PRINTF("Converted to: %lu.%03lu MB\n",
+                   (unsigned long)mb,
+                   (unsigned long)mb_frac);
         return 0;
 }
 
@@ -170,8 +174,9 @@ int lfs_first_run(void)
         int total_blocks = lfs_w25qxx_cfg.block_count;
         int used_blocks = lfs_fs_size(&s_lfs);
         int free_blocks = total_blocks - used_blocks;
-        DBG_PRINTF("Free space: %d blocks (%d bytes)\n",
-                   free_blocks, free_blocks * lfs_w25qxx_cfg.block_size);
+        DBG_PRINTF("Free space: %d blocks (%lu bytes)\n",
+                   free_blocks,
+                   (unsigned long)((lfs_size_t)free_blocks * lfs_w25qxx_cfg.block_size));
         bytes_to_mb(free_blocks * lfs_w25qxx_cfg.block_size);
 
         /* boot_count */
@@ -190,10 +195,10 @@ int lfs_first_run(void)
         struct lfs_info info;
         lfs_dir_open(&s_lfs, &dir, "/");
         while (lfs_dir_read(&s_lfs, &dir, &info)) {
-                DBG_PRINTF("%s (%s, size: %d)\n",
+                DBG_PRINTF("%s (%s, size: %lu)\n",
                            info.name,
                            info.type == LFS_TYPE_REG ? "file" : "dir",
-                           info.size);
+                           (unsigned long)info.size);
         }
         lfs_dir_close(&s_lfs, &dir);
 

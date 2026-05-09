@@ -4,11 +4,10 @@
 // 1. FreeRTOSConfig.h 启用 Hook
 #define configUSE_TRACE_FACILITY        0
 #define configUSE_APPLICATION_TASK_TAG  0
-// // 2. 定义任务切换 Hook（Trace 宏）
-// #define traceTASK_SWITCHED_IN()  \
-//         printf("Task in: [%s]\n", pcTaskGetName(NULL))
-// #define traceTASK_SWITCHED_OUT() \
-//         printf("Task [%s] switched out\n", pcTaskGetName(NULL));
+/* 2. 定义任务切换 Hook（Trace 宏）示例
+#define traceTASK_SWITCHED_IN()  printf("Task in: [%s]\n", pcTaskGetName(NULL))
+#define traceTASK_SWITCHED_OUT() printf("Task [%s] switched out\n", pcTaskGetName(NULL))
+*/
 // 设置为1使用抢占式，为0使用时间片轮转调度。
 #define configUSE_PREEMPTION                    1
 // 设置为1使能低功耗tickless模式，为0保持系统节拍（tick）中断一直运行。
