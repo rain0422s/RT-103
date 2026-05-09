@@ -41,6 +41,12 @@ static bool sensor_measure_accel_avg_mg(stmdev_ctx_t *ctx, uint16_t samples,
 
 static void sensor_update_attitude(float ax_mg, float ay_mg, float az_mg);
 
+static float sensor_raw_to_mg(int16_t raw)
+{
+	return s_chip_high_perf ? LIS2DH12_FROM_FS_2g_HR_TO_mg(raw)
+				: LIS2DH12_FROM_FS_2g_LP_TO_mg(raw);
+}
+
 static float rad_to_deg(float rad)
 {
 	return rad * (180.0f / M_PI);
@@ -124,12 +130,9 @@ static void sensor_fifo_drain_and_update(stmdev_ctx_t *ctx)
 		const int16_t rx = (int16_t)(fifo_raw[i * 3 + 0] - off_x);
 		const int16_t ry = (int16_t)(fifo_raw[i * 3 + 1] - off_y);
 		const int16_t rz = (int16_t)(fifo_raw[i * 3 + 2] - off_z);
-		const float ax_mg = s_chip_high_perf ? LIS2DH12_FROM_FS_2g_HR_TO_mg(rx)
-						     : LIS2DH12_FROM_FS_2g_LP_TO_mg(rx);
-		const float ay_mg = s_chip_high_perf ? LIS2DH12_FROM_FS_2g_HR_TO_mg(ry)
-						     : LIS2DH12_FROM_FS_2g_LP_TO_mg(ry);
-		const float az_mg = s_chip_high_perf ? LIS2DH12_FROM_FS_2g_HR_TO_mg(rz)
-						     : LIS2DH12_FROM_FS_2g_LP_TO_mg(rz);
+		const float ax_mg = sensor_raw_to_mg(rx);
+		const float ay_mg = sensor_raw_to_mg(ry);
+		const float az_mg = sensor_raw_to_mg(rz);
 		sensor_update_attitude(ax_mg, ay_mg, az_mg);
 	}
 }

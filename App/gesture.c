@@ -8,6 +8,12 @@
 
 static QueueHandle_t s_gesture_evt_queue = NULL;
 
+static void gesture_post_event(gesture_key_event_t e)
+{
+	if (s_gesture_evt_queue != NULL)
+		(void)xQueueSend(s_gesture_evt_queue, &e, 0);
+}
+
 bool gesture_key_event_get(gesture_key_event_t *evt)
 {
 	if (evt == NULL || s_gesture_evt_queue == NULL)
@@ -33,24 +39,15 @@ void gesture_task(void *arg)
 		switch (evt) {
 		case SHORT_PRESS_STATE:
 			DBG_PRINTF("[key] short press\n");
-			if (s_gesture_evt_queue != NULL) {
-				const gesture_key_event_t e = GESTURE_KEY_SINGLE_CLICK;
-				(void)xQueueSend(s_gesture_evt_queue, &e, 0);
-			}
+			gesture_post_event(GESTURE_KEY_SINGLE_CLICK);
 			break;
 		case LONG_PRESS_STATE:
 			DBG_PRINTF("[key] long press\n");
-			if (s_gesture_evt_queue != NULL) {
-				const gesture_key_event_t e = GESTURE_KEY_LONG_PRESS;
-				(void)xQueueSend(s_gesture_evt_queue, &e, 0);
-			}
+			gesture_post_event(GESTURE_KEY_LONG_PRESS);
 			break;
 		case DOUBLE_PRESS_STATE:
 			DBG_PRINTF("[key] double press\n");
-			if (s_gesture_evt_queue != NULL) {
-				const gesture_key_event_t e = GESTURE_KEY_DOUBLE_CLICK;
-				(void)xQueueSend(s_gesture_evt_queue, &e, 0);
-			}
+			gesture_post_event(GESTURE_KEY_DOUBLE_CLICK);
 			break;
 		default:
 			break;
