@@ -22,6 +22,18 @@ static struct i2c_cli s_m24c02;
 static bool s_eeprom_inited;   /* init (bus + client) has been run */
 static bool s_eeprom_present;  /* device responded on I2C; only then allow load/save */
 
+static void storage_config_set_defaults(eeprom_config_t *out)
+{
+	if (out == NULL)
+		return;
+	memset(out, 0, sizeof(*out));
+	out->magic = EEPROM_MAGIC;
+	out->version = EEPROM_CONFIG_VERSION;
+	out->ui_select = 0;
+	out->rtc_calib_sec_per_day = 0;
+	out->rtc_calib_anchor_raw = 0;
+}
+
 /** Idempotent: init I2C bus and M24C02 client, then detect device. If not present, EEPROM load/save APIs return false. */
 void storage_eeprom_init(void)
 {
@@ -49,10 +61,7 @@ bool storage_load_config(eeprom_config_t *out)
 	if (!at24cxx_read(s_m24c02, EEPROM_OFFSET_CONFIG, (uint8_t *)out, sizeof(eeprom_config_t)))
 		return false;
 	if (out->magic != EEPROM_MAGIC || out->version != EEPROM_CONFIG_VERSION) {
-		out->magic   = EEPROM_MAGIC;
-		out->version = EEPROM_CONFIG_VERSION;
-		out->ui_select = 0;
-		out->reserved  = 0;
+		storage_config_set_defaults(out);
 		return false; /* no valid data, use defaults already set */
 	}
 	return true;

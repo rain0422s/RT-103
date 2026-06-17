@@ -47,6 +47,7 @@
 #include "gesture.h"
 #include "uart_forward.h"
 #include "power_key.h"
+#include "rtc_clock.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -121,6 +122,7 @@ int main(void)
   MX_TIM3_Init();
   MX_TIM2_Init();
   MX_SPI3_Init();
+  (void)rtc_clock_init();
   /* USER CODE BEGIN 2 */
   HAL_TIM_PWM_Start(&htim2,TIM_CHANNEL_1);
   PowerOn;

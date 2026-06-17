@@ -10,7 +10,7 @@
 
 /* --- Layout (AT24C02 = 256 bytes) --- */
 #define EEPROM_MAGIC          0xE5A1
-#define EEPROM_CONFIG_VERSION 1
+#define EEPROM_CONFIG_VERSION 2
 
 #define EEPROM_OFFSET_CONFIG  0   /* eeprom_config_t (see below) */
 #define EEPROM_OFFSET_CALIB   32  /* lis2dh12_calib_t (zero-g offset in LSB) */
@@ -28,13 +28,15 @@ typedef struct {
 
 /**
  * Persistent config saved to EEPROM.
- * Add fields as needed; keep total size small to fit one EEPROM page (8 bytes for AT24C02).
+ * Keep total size below EEPROM_OFFSET_CALIB.
  */
 typedef struct {
-	uint16_t magic;      /* EEPROM_MAGIC if valid */
-	uint8_t  version;   /* EEPROM_CONFIG_VERSION */
-	int8_t   ui_select;  /* last selected menu/screen index (e.g. U8G2 list) */
-	uint8_t  reserved;  /* alignment / future use */
+	uint16_t magic;                /* EEPROM_MAGIC if valid */
+	uint8_t  version;              /* EEPROM_CONFIG_VERSION */
+	int8_t   ui_select;            /* last selected secondary-menu index */
+	int8_t   rtc_calib_sec_per_day; /* software RTC correction, seconds/day */
+	uint8_t  reserved[3];          /* align following 32-bit field */
+	uint32_t rtc_calib_anchor_raw;  /* raw RTC seconds at last calib/time set */
 } eeprom_config_t;
 
 #endif /* __EEPROM_LAYOUT_H */

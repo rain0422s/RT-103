@@ -18,6 +18,8 @@ void ui_menu_registry_register_all(ui_menu_register_fn_t reg_fn)
 	if (reg_fn == NULL)
 		return;
 	storage_menu_register_items(reg_fn);
+	(void)reg_fn("Time Set", display_action_time_set);
+	(void)reg_fn("RTC Calib", display_action_rtc_calib);
 	for (size_t i = 0; i < sizeof(splash_ids) / sizeof(splash_ids[0]); i++)
 		(void)reg_fn(splash_ids[i], ui_action_show_boot_image);
 }

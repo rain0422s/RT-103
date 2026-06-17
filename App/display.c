@@ -8,7 +8,9 @@
 #include "gesture.h"
 #include "lfs_port.h"
 #include "ui_menu_registry.h"
+#include "rtc_clock.h"
 #include "task.h"
+#include <stdio.h>
 
 extern const uint8_t u8g2_font_6x12_tf[];
 
@@ -18,8 +20,14 @@ typedef struct {
         uint8_t id;
         uint8_t press;
         uint8_t long_press;
+        uint8_t double_press;
         uint8_t update_flag;
 } key_msg_t;
+
+typedef enum {
+        UI_MODE_CLOCK = 0,
+        UI_MODE_MENU,
+} ui_mode_t;
 
 typedef struct ui_menu_item {
         const char *str;
@@ -44,6 +52,9 @@ static short list_scroll_y, list_scroll_y_trg;
 static short x = 0;
 static signed char ui_select = 0;
 static bool ui_flag = true;
+static ui_mode_t s_ui_mode = UI_MODE_CLOCK;
+static short s_view_x;
+static short s_view_x_trg;
 static short s_line_h = 18;
 static short s_frame_h = 20;
 static short s_text_x = 2;
@@ -52,6 +63,7 @@ static short s_text_y0 = 13;
 
 static key_msg_t key_msg = {0};
 static bool s_force_full_refresh = true;
+static eeprom_config_t s_ui_config;
 static volatile bool s_shutdown_prompt_show;
 static volatile bool s_shutdown_prompt_confirmed;
 static volatile uint8_t s_shutdown_prompt_progress_pct;
@@ -59,6 +71,34 @@ static volatile uint8_t s_shutdown_prompt_progress_pct;
 static short abs_s(short i)
 {
         return (i < 0) ? (short)(~(i - 1)) : i;
+}
+
+static void ui_config_defaults(eeprom_config_t *cfg)
+{
+        if (cfg == NULL)
+                return;
+        *cfg = (eeprom_config_t){
+                .magic = EEPROM_MAGIC,
+                .version = EEPROM_CONFIG_VERSION,
+                .ui_select = 0,
+                .rtc_calib_sec_per_day = 0,
+                .rtc_calib_anchor_raw = 0,
+        };
+}
+
+static void ui_config_load(void)
+{
+        ui_config_defaults(&s_ui_config);
+        (void)storage_load_config(&s_ui_config);
+        s_ui_config.magic = EEPROM_MAGIC;
+        s_ui_config.version = EEPROM_CONFIG_VERSION;
+}
+
+static void ui_config_save(void)
+{
+        s_ui_config.magic = EEPROM_MAGIC;
+        s_ui_config.version = EEPROM_CONFIG_VERSION;
+        (void)storage_save_config(&s_ui_config);
 }
 
 void display_wait_double_click_exit(void)
@@ -96,6 +136,123 @@ void display_show_text_feedback(u8g2_t *pu8g2, const char *line1, const char *li
                 return;
         }
         delay_ms(hold_ms);
+}
+
+static void display_draw_time_editor(u8g2_t *pu8g2, uint8_t hour, uint8_t minute,
+                                     uint8_t second, uint8_t field)
+{
+        char buf[16];
+        static const short field_x[] = {24, 48, 72};
+
+        u8g2_ClearBuffer(pu8g2);
+        u8g2_DrawStr(pu8g2, 35, 14, "Time Set");
+        (void)snprintf(buf, sizeof(buf), "%02u:%02u:%02u", hour, minute, second);
+        u8g2_DrawStr(pu8g2, 24, 38, buf);
+        if (field < 3u)
+                u8g2_DrawFrame(pu8g2, field_x[field], 24, 18, 18);
+        u8g2_SendBuffer(pu8g2);
+}
+
+void display_action_time_set(u8g2_t *pu8g2)
+{
+        rtc_clock_time_t now;
+        uint8_t hour;
+        uint8_t minute;
+        uint8_t second;
+        uint8_t field = 0;
+
+        if (pu8g2 == NULL)
+                return;
+        if (!rtc_clock_is_ready()) {
+                display_show_text_feedback(pu8g2, "RTC", "Unavailable", 900);
+                return;
+        }
+
+        now = rtc_clock_get_time(&s_ui_config);
+        hour = now.valid ? now.hour : 0;
+        minute = now.valid ? now.minute : 0;
+        second = now.valid ? now.second : 0;
+
+        for (;;) {
+                gesture_key_event_t evt = GESTURE_KEY_NONE;
+
+                display_draw_time_editor(pu8g2, hour, minute, second, field);
+                while (gesture_key_event_get(&evt)) {
+                        if (evt == GESTURE_KEY_SINGLE_CLICK) {
+                                if (field == 0)
+                                        hour = (uint8_t)((hour + 1u) % 24u);
+                                else if (field == 1)
+                                        minute = (uint8_t)((minute + 1u) % 60u);
+                                else
+                                        second = (uint8_t)((second + 1u) % 60u);
+                        } else if (evt == GESTURE_KEY_LONG_PRESS) {
+                                field = (uint8_t)((field + 1u) % 3u);
+                        } else if (evt == GESTURE_KEY_DOUBLE_CLICK) {
+                                if (rtc_clock_set_time(hour, minute, second)) {
+                                        s_ui_config.rtc_calib_anchor_raw = rtc_clock_get_raw_seconds();
+                                        ui_config_save();
+                                        display_show_text_feedback(pu8g2, "Time Set", "Saved", 600);
+                                } else {
+                                        display_show_text_feedback(pu8g2, "Time Set", "Failed", 900);
+                                }
+                                s_force_full_refresh = true;
+                                return;
+                        }
+                }
+                delay_ms(60);
+        }
+}
+
+static void display_draw_calib_editor(u8g2_t *pu8g2, int8_t value)
+{
+        char buf[18];
+
+        u8g2_ClearBuffer(pu8g2);
+        u8g2_DrawStr(pu8g2, 32, 14, "RTC Calib");
+        (void)snprintf(buf, sizeof(buf), "%+d s/day", (int)value);
+        u8g2_DrawStr(pu8g2, 34, 38, buf);
+        u8g2_SendBuffer(pu8g2);
+}
+
+void display_action_rtc_calib(u8g2_t *pu8g2)
+{
+        int8_t value;
+        int8_t dir;
+
+        if (pu8g2 == NULL)
+                return;
+
+        value = rtc_clock_calib_get(&s_ui_config);
+        dir = (value < 0) ? -1 : 1;
+
+        for (;;) {
+                gesture_key_event_t evt = GESTURE_KEY_NONE;
+
+                display_draw_calib_editor(pu8g2, value);
+                while (gesture_key_event_get(&evt)) {
+                        if (evt == GESTURE_KEY_SINGLE_CLICK) {
+                                value = (int8_t)(value + dir);
+                                if (value > 30)
+                                        value = 0;
+                                else if (value < -30)
+                                        value = 0;
+                        } else if (evt == GESTURE_KEY_LONG_PRESS) {
+                                if (value == 0)
+                                        dir = (int8_t)-dir;
+                                else {
+                                        value = (int8_t)-value;
+                                        dir = (value < 0) ? -1 : 1;
+                                }
+                        } else if (evt == GESTURE_KEY_DOUBLE_CLICK) {
+                                rtc_clock_calib_set(&s_ui_config, value);
+                                ui_config_save();
+                                display_show_text_feedback(pu8g2, "RTC Calib", "Saved", 600);
+                                s_force_full_refresh = true;
+                                return;
+                        }
+                }
+                delay_ms(60);
+        }
 }
 
 static bool ui_menu_register(const char *name, void (*on_long_press)(u8g2_t *pu8g2))
@@ -157,10 +314,12 @@ static void key_scan(void)
 {
         gesture_key_event_t evt = GESTURE_KEY_NONE;
         while (gesture_key_event_get(&evt)) {
-                if (evt == GESTURE_KEY_SINGLE_CLICK || evt == GESTURE_KEY_LONG_PRESS) {
+                if (evt == GESTURE_KEY_SINGLE_CLICK || evt == GESTURE_KEY_LONG_PRESS ||
+                    evt == GESTURE_KEY_DOUBLE_CLICK) {
                         key_msg.id = 0;
-                        key_msg.press = (evt != GESTURE_KEY_LONG_PRESS);
+                        key_msg.press = (evt == GESTURE_KEY_SINGLE_CLICK);
                         key_msg.long_press = (evt == GESTURE_KEY_LONG_PRESS);
+                        key_msg.double_press = (evt == GESTURE_KEY_DOUBLE_CLICK);
                         key_msg.update_flag = 1;
                 }
         }
@@ -179,11 +338,11 @@ static uint8_t ui_run(short *a, short *a_trg, uint8_t step, uint8_t slow_cnt)
 }
 
 /** Vertical scroll indicator: opposite side of list text (right edge). */
-static void ui_draw_list_scroll_indicator(u8g2_t *pu8g2)
+static void ui_draw_list_scroll_indicator(u8g2_t *pu8g2, short offset_x)
 {
         const int list_len = ui_menu_count();
         short visible_rows = (short)((CONFIG_SCREEN_HEIGHT - 2) / s_line_h);
-        const short track_x = (short)(CONFIG_SCREEN_WIDTH - 5);
+        const short track_x = (short)(CONFIG_SCREEN_WIDTH - 5 + offset_x);
         const short track_w = 3;
         const short track_top = 2;
         const short track_h = (short)(CONFIG_SCREEN_HEIGHT - 4);
@@ -266,35 +425,68 @@ static void ui_update_frame_target(u8g2_t *pu8g2)
         list_scroll_y_trg = (short)(top_index * s_line_h);
 }
 
-static bool ui_show(u8g2_t *pu8g2, bool force_full)
+static void ui_draw_clock(u8g2_t *pu8g2, short offset_x)
+{
+        rtc_clock_time_t t = rtc_clock_get_time(&s_ui_config);
+        char buf[12];
+        uint8_t text_w;
+        short text_x;
+
+        if (t.valid)
+                (void)snprintf(buf, sizeof(buf), "%02u:%02u:%02u", t.hour, t.minute, t.second);
+        else
+                (void)snprintf(buf, sizeof(buf), "--:--:--");
+
+        u8g2_DrawStr(pu8g2, (short)(offset_x + 46), 16, "RTC");
+        text_w = (uint8_t)u8g2_GetStrWidth(pu8g2, buf);
+        text_x = (short)(offset_x + ((CONFIG_SCREEN_WIDTH - text_w) / 2));
+        u8g2_DrawStr(pu8g2, text_x, 38, buf);
+
+        if (!rtc_clock_is_ready())
+                u8g2_DrawStr(pu8g2, (short)(offset_x + 28), 58, "RTC unavailable");
+        else if (!rtc_clock_time_is_set())
+                u8g2_DrawStr(pu8g2, (short)(offset_x + 34), 58, "Time not set");
+}
+
+static void ui_draw_menu(u8g2_t *pu8g2, short offset_x)
 {
         const int list_len = ui_menu_count();
-        const short prev_frame_y = frame_y;
-        const short prev_frame_len = frame_len;
         const ui_menu_item_t *it = s_menu_head;
         int i = 0;
 
-        u8g2_ClearBuffer(pu8g2);
         while (it != NULL && i < list_len) {
                 const short yy = (short)(s_text_y0 + i * s_line_h - list_scroll_y);
                 const char *line = it->str;
-                u8g2_DrawStr(pu8g2, s_text_x, yy, line);
+                u8g2_DrawStr(pu8g2, (short)(s_text_x + offset_x), yy, line);
                 it = it->next;
                 i++;
         }
-        u8g2_DrawRFrame(pu8g2, x, (short)(frame_y - list_scroll_y), frame_len, s_frame_h, 3);
-        ui_draw_list_scroll_indicator(pu8g2);
-        {
-                const bool anim_y = ui_run(&frame_y, &frame_y_trg, 5, 4) != 0;
-                const bool anim_len = ui_run(&frame_len, &frame_len_trg, 10, 5) != 0;
-                const bool anim_scroll = ui_run(&list_scroll_y, &list_scroll_y_trg, 5, 4) != 0;
-                const bool animating = anim_y || anim_len || anim_scroll;
-                (void)force_full;
-                (void)prev_frame_y;
-                (void)prev_frame_len;
-                u8g2_SendBuffer(pu8g2);
-                return animating;
-        }
+        u8g2_DrawRFrame(pu8g2, (short)(x + offset_x), (short)(frame_y - list_scroll_y),
+                        frame_len, s_frame_h, 3);
+        ui_draw_list_scroll_indicator(pu8g2, offset_x);
+}
+
+static bool ui_update_animation(void)
+{
+        const bool anim_view = ui_run(&s_view_x, &s_view_x_trg, 12, 3) != 0;
+        const bool anim_y = ui_run(&frame_y, &frame_y_trg, 5, 4) != 0;
+        const bool anim_len = ui_run(&frame_len, &frame_len_trg, 10, 5) != 0;
+        const bool anim_scroll = ui_run(&list_scroll_y, &list_scroll_y_trg, 5, 4) != 0;
+
+        return anim_view || anim_y || anim_len || anim_scroll;
+}
+
+static bool ui_show(u8g2_t *pu8g2, bool force_full)
+{
+        bool animating;
+
+        (void)force_full;
+        u8g2_ClearBuffer(pu8g2);
+        ui_draw_clock(pu8g2, (short)(-s_view_x));
+        ui_draw_menu(pu8g2, (short)(CONFIG_SCREEN_WIDTH - s_view_x));
+        animating = ui_update_animation();
+        u8g2_SendBuffer(pu8g2);
+        return animating;
 }
 
 static bool ui_proc(u8g2_t *pu8g2)
@@ -303,16 +495,33 @@ static bool ui_proc(u8g2_t *pu8g2)
         bool got_ui_event = false;
         if (list_len <= 0)
                 return ui_show(pu8g2, true);
-        if (key_msg.update_flag && key_msg.long_press) {
+
+        if (key_msg.update_flag && key_msg.double_press) {
                 key_msg.update_flag = 0;
+                key_msg.double_press = 0;
                 key_msg.long_press = 0;
                 key_msg.press = 0;
                 got_ui_event = true;
+                if (s_ui_mode == UI_MODE_CLOCK) {
+                        s_ui_mode = UI_MODE_MENU;
+                        s_view_x_trg = CONFIG_SCREEN_WIDTH;
+                        ui_update_frame_target(pu8g2);
+                } else {
+                        s_ui_mode = UI_MODE_CLOCK;
+                        s_view_x_trg = 0;
+                }
+        } else if (s_ui_mode == UI_MODE_MENU && key_msg.update_flag && key_msg.long_press) {
+                key_msg.update_flag = 0;
+                key_msg.long_press = 0;
+                key_msg.press = 0;
+                key_msg.double_press = 0;
+                got_ui_event = true;
                 ui_execute_selected_action(pu8g2);
-        } else if (key_msg.update_flag && key_msg.press) {
+        } else if (s_ui_mode == UI_MODE_MENU && key_msg.update_flag && key_msg.press) {
                 key_msg.update_flag = 0;
                 key_msg.press = 0;
                 key_msg.long_press = 0;
+                key_msg.double_press = 0;
                 got_ui_event = true;
                 if (ui_flag) {
                         ui_select++;
@@ -324,15 +533,13 @@ static bool ui_proc(u8g2_t *pu8g2)
                                 ui_flag = true;
                 }
                 ui_update_frame_target(pu8g2);
-                {
-                        eeprom_config_t c = {
-                                .magic = EEPROM_MAGIC,
-                                .version = EEPROM_CONFIG_VERSION,
-                                .ui_select = ui_select,
-                                .reserved = 0,
-                        };
-                        storage_save_config(&c);
-                }
+                s_ui_config.ui_select = ui_select;
+                ui_config_save();
+        } else if (key_msg.update_flag) {
+                key_msg.update_flag = 0;
+                key_msg.press = 0;
+                key_msg.long_press = 0;
+                key_msg.double_press = 0;
         }
         return ui_show(pu8g2, s_force_full_refresh || got_ui_event);
 }
@@ -400,6 +607,9 @@ void ui_test(u8g2_t *pu8g2)
         ui_update_frame_target(pu8g2);
         frame_len = frame_len_trg;
         list_scroll_y = list_scroll_y_trg;
+        s_ui_mode = UI_MODE_CLOCK;
+        s_view_x = 0;
+        s_view_x_trg = 0;
 #endif
 }
 
@@ -408,13 +618,11 @@ void ui_task(void *arg)
         int list_len;
         uint32_t stack_log_tick_ms = HAL_GetTick();
         int8_t init_sel = 0;
-        eeprom_config_t eeprom_cfg;
         (void)arg;
 
         storage_eeprom_init();
-        if (storage_load_config(&eeprom_cfg)) {
-                init_sel = eeprom_cfg.ui_select;
-        }
+        ui_config_load();
+        init_sel = s_ui_config.ui_select;
 
         if (!s_menu_defaults_registered) {
                 ui_menu_registry_register_all(ui_menu_register);

@@ -1,0 +1,57 @@
+---
+description: Git commit messages in English (Conventional Commits), with a blank line before the body; use when writing commits.
+alwaysApply: true
+---
+
+# Git commit message format (English)
+
+Write **commit titles and bodies in English**. Do not use the Chinese `模块：` subject style unless the user explicitly asks for it.
+
+## Subject line (first line)
+
+Use **[Conventional Commits](https://www.conventionalcommits.org/)** style:
+
+```text
+type(scope): short imperative description
+```
+
+- **type**: `feat`, `fix`, `refactor`, `docs`, `chore`, `build`, `test`, etc.
+- **scope** (optional): area, e.g. `ui`, `sensor`, `storage`, `oled`, `rtos`.
+- **description**: imperative mood, no period at the end, **~50 characters or fewer** when possible.
+
+Examples:
+
+```text
+feat(ui): unify long-press entry and double-click exit
+fix(sensor): correct FIFO watermark after mode switch
+refactor(gesture): extract gesture_post_event helper
+```
+
+## Line breaks and body
+
+- After the subject line, add a **blank line**, then the **body** (one or more paragraphs).
+- Do not cram the body on the same line as the subject.
+- Wrap body lines at about **72 characters** when a line would get too long.
+
+## Good example
+
+```text
+feat(ui): unify long-press entry and double-click exit
+
+Extract gesture_post_event for queue sends. Add sensor_raw_to_mg for
+FIFO samples. Align storage-ready gating with menu registration.
+```
+
+## Bad examples
+
+Single line mixing subject and body:
+
+```text
+feat(ui): unify long-press entry and double-click exit Extract gesture_post_event for queue sends.
+```
+
+Non-English subject (unless user requested Chinese):
+
+```text
+UI模块：统一长按进入与双击退出交互
+```
