@@ -1,5 +1,6 @@
 #include "storage.h"
 #include "power_key.h"
+#include "rtc_clock.h"
 #include "sensor.h"
 #include "display.h"
 #include "lfs.h"
@@ -32,6 +33,18 @@ static void storage_config_set_defaults(eeprom_config_t *out)
 	out->ui_select = 0;
 	out->rtc_calib_sec_per_day = 0;
 	out->rtc_calib_anchor_raw = 0;
+	out->rtc_uptime_seconds = 0;
+	out->clock_display_mode = CLOCK_DISPLAY_MODE_UPTIME;
+}
+
+static void storage_config_sanitize(eeprom_config_t *cfg)
+{
+	if (cfg == NULL)
+		return;
+	if (cfg->clock_display_mode != CLOCK_DISPLAY_MODE_RTC &&
+	    cfg->clock_display_mode != CLOCK_DISPLAY_MODE_UPTIME) {
+		cfg->clock_display_mode = CLOCK_DISPLAY_MODE_UPTIME;
+	}
 }
 
 /** Idempotent: init I2C bus and M24C02 client, then detect device. If not present, EEPROM load/save APIs return false. */
@@ -60,10 +73,27 @@ bool storage_load_config(eeprom_config_t *out)
 		return false;
 	if (!at24cxx_read(s_m24c02, EEPROM_OFFSET_CONFIG, (uint8_t *)out, sizeof(eeprom_config_t)))
 		return false;
-	if (out->magic != EEPROM_MAGIC || out->version != EEPROM_CONFIG_VERSION) {
+	if (out->magic != EEPROM_MAGIC) {
 		storage_config_set_defaults(out);
 		return false; /* no valid data, use defaults already set */
 	}
+	if (out->version == 2u) {
+		out->version = EEPROM_CONFIG_VERSION;
+		out->rtc_uptime_seconds = 0;
+		out->clock_display_mode = CLOCK_DISPLAY_MODE_UPTIME;
+		return true;
+	}
+	if (out->version == 3u) {
+		out->version = EEPROM_CONFIG_VERSION;
+		out->clock_display_mode = CLOCK_DISPLAY_MODE_UPTIME;
+		storage_config_sanitize(out);
+		return true;
+	}
+	if (out->version != EEPROM_CONFIG_VERSION) {
+		storage_config_set_defaults(out);
+		return false; /* no valid data, use defaults already set */
+	}
+	storage_config_sanitize(out);
 	return true;
 }
 
@@ -133,8 +163,8 @@ void storage_menu_register_items(storage_menu_register_fn_t reg_fn)
 {
 	if (reg_fn == NULL)
 		return;
-	(void)reg_fn("boot", storage_menu_action_show_boot_count);
-	(void)reg_fn("calib", storage_menu_action_run_calibration);
+	(void)reg_fn("boot", storage_menu_action_show_boot_count, UI_MENU_MODE_ALL);
+	(void)reg_fn("calib", storage_menu_action_run_calibration, UI_MENU_MODE_ALL);
 }
 
 /** EEPROM test: backup one small block in the stats area, write a pattern, verify, then restore backup. */
@@ -217,6 +247,17 @@ bool storage_system_ready(void)
 
 void storage_prepare_shutdown(void)
 {
+	storage_eeprom_init();
+	if (storage_eeprom_is_present()) {
+		eeprom_config_t cfg;
+
+		storage_config_set_defaults(&cfg);
+		(void)storage_load_config(&cfg);
+		cfg.magic = EEPROM_MAGIC;
+		cfg.version = EEPROM_CONFIG_VERSION;
+		cfg.rtc_uptime_seconds = rtc_clock_get_uptime_seconds(&cfg);
+		(void)storage_save_config(&cfg);
+	}
 	if (storage_flash_is_present()) {
 		lfs_unmount_fs();
 	}

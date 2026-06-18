@@ -152,7 +152,9 @@ void led_control_task(void *arg)
 			breathing_led_set(false);
 			break;
 		case LED_CMD_READY:
-			breathing_led_set(true);
+			breathing_led_set(false);
+			/* POWER_LED is active-low on PA15/TIM2_CH1; keep it on for board debug. */
+			__HAL_TIM_SetCompare(&htim2, TIM_CHANNEL_1, 0);
 			led_blink_start_4s();
 			break;
 		case LED_CMD_ALL_OFF:

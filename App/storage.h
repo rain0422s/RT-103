@@ -4,13 +4,15 @@
 #include "at24cxx.h"
 #include "i2cdev.h"
 #include "eeprom_layout.h"
+#include "ui_menu_mode.h"
 #include "oled.h"
 #include "string.h"
 typedef struct {
     int   i[2];
     float f;
 } object_t;
-typedef bool (*storage_menu_register_fn_t)(const char *name, void (*on_long_press)(u8g2_t *pu8g2));
+typedef bool (*storage_menu_register_fn_t)(const char *name, void (*on_long_press)(u8g2_t *pu8g2),
+					   uint8_t mode_mask);
 
 /** Flash (W25Qxx): idempotent init + read_id check (0xEF); only when present can LittleFS/flash ops be used. */
 void storage_flash_init(void);

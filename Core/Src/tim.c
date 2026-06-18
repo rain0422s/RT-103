@@ -163,6 +163,8 @@ void HAL_TIM_MspPostInit(TIM_HandleTypeDef* timHandle)
     HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
     __HAL_AFIO_REMAP_TIM2_PARTIAL_1();
+    /* PA15 is JTDI by default; keep SWD active but release PA15 for TIM2_CH1. */
+    __HAL_AFIO_REMAP_SWJ_NOJTAG();
 
   /* USER CODE BEGIN TIM2_MspPostInit 1 */
 
