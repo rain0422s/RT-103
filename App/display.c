@@ -631,6 +631,7 @@ static void ui_update_frame_target(u8g2_t *pu8g2)
 #define UI_CLOCK_DIGIT_H 46
 #define UI_CLOCK_SEG_T   4
 #define UI_CLOCK_GAP     3
+#define UI_CLOCK_DIGIT_ONE_GAP_EXTRA 2
 #define UI_CLOCK_COLON_W 4
 #define UI_CLOCK_COLON_GAP 5
 #define UI_CLOCK_LEFT_X  2
@@ -915,6 +916,15 @@ static void ui_7seg_visual_bounds(uint8_t digit, short *left, short *right)
                 *right = r;
 }
 
+static short ui_7seg_pair_gap(uint8_t left_digit, uint8_t right_digit)
+{
+        short gap = UI_CLOCK_GAP;
+
+        if (left_digit == 1u || right_digit == 1u)
+                gap = (short)(gap + UI_CLOCK_DIGIT_ONE_GAP_EXTRA);
+        return gap;
+}
+
 static void ui_draw_7seg_digit(u8g2_t *pu8g2, short x, short y, uint8_t digit)
 {
         const short w = UI_CLOCK_DIGIT_W;
@@ -969,11 +979,13 @@ static void ui_draw_7seg_time(u8g2_t *pu8g2, short x, short y, uint8_t hour, uin
                 ui_7seg_visual_bounds(digits[i], &left[i], &right[i]);
 
         rel_x[0] = (short)-left[0];
-        rel_x[1] = (short)(rel_x[0] + right[0] + UI_CLOCK_GAP - left[1]);
+        rel_x[1] = (short)(rel_x[0] + right[0] +
+                           ui_7seg_pair_gap(digits[0], digits[1]) - left[1]);
         colon_x = (short)(rel_x[1] + right[1] + UI_CLOCK_COLON_GAP);
         rel_x[2] = (short)(colon_x + UI_CLOCK_COLON_W + UI_CLOCK_COLON_GAP -
                            left[2]);
-        rel_x[3] = (short)(rel_x[2] + right[2] + UI_CLOCK_GAP - left[3]);
+        rel_x[3] = (short)(rel_x[2] + right[2] +
+                           ui_7seg_pair_gap(digits[2], digits[3]) - left[3]);
         total_w = (short)(rel_x[3] + right[3]);
         base_x = (short)(x + (UI_CLOCK_TIME_AREA_W - total_w) / 2);
 
@@ -1576,6 +1588,50 @@ void display_show_shutdown_prompt(bool show, bool confirmed, uint8_t progress_pc
         s_shutdown_prompt_progress_pct = (progress_pct > 100u) ? 100u : progress_pct;
 }
 
+static void ui_draw_shutdown_progress_ring(u8g2_t *pu8g2, short cx, short cy,
+                                           uint8_t progress_pct, bool confirmed)
+{
+        const uint8_t start = 64U;
+        const uint8_t span = (progress_pct >= 100U) ? 255U :
+                             (uint8_t)(((uint16_t)progress_pct * 255U + 50U) / 100U);
+        const uint8_t end = (uint8_t)(start + span);
+
+        u8g2_DrawCircle(pu8g2, (u8g2_uint_t)cx, (u8g2_uint_t)cy, 19, U8G2_DRAW_ALL);
+        if (progress_pct >= 100U) {
+                u8g2_DrawCircle(pu8g2, (u8g2_uint_t)cx, (u8g2_uint_t)cy, 18, U8G2_DRAW_ALL);
+                u8g2_DrawCircle(pu8g2, (u8g2_uint_t)cx, (u8g2_uint_t)cy, 17, U8G2_DRAW_ALL);
+        } else if (progress_pct > 0U) {
+                u8g2_DrawArc(pu8g2, (u8g2_uint_t)cx, (u8g2_uint_t)cy, 19, start, end);
+                u8g2_DrawArc(pu8g2, (u8g2_uint_t)cx, (u8g2_uint_t)cy, 18, start, end);
+                u8g2_DrawArc(pu8g2, (u8g2_uint_t)cx, (u8g2_uint_t)cy, 17, start, end);
+        }
+        if (confirmed)
+                u8g2_DrawDisc(pu8g2, (u8g2_uint_t)cx, (u8g2_uint_t)cy, 2, U8G2_DRAW_ALL);
+}
+
+static void ui_draw_shutdown_power_icon(u8g2_t *pu8g2, short cx, short cy,
+                                        bool confirmed)
+{
+        const uint8_t start = confirmed ? 36U : 42U;
+        const uint8_t end = confirmed ? 220U : 214U;
+
+        u8g2_DrawArc(pu8g2, (u8g2_uint_t)cx, (u8g2_uint_t)(cy + 1), 8, start, end);
+        u8g2_DrawArc(pu8g2, (u8g2_uint_t)cx, (u8g2_uint_t)(cy + 1), 7, start, end);
+        u8g2_DrawLine(pu8g2, (u8g2_uint_t)cx, (u8g2_uint_t)(cy - 9),
+                      (u8g2_uint_t)cx, (u8g2_uint_t)(cy - 1));
+        if (confirmed)
+                u8g2_DrawDisc(pu8g2, (u8g2_uint_t)cx, (u8g2_uint_t)(cy + 1),
+                              1, U8G2_DRAW_ALL);
+}
+
+static void ui_draw_shutdown_prompt(u8g2_t *pu8g2, uint8_t progress_pct, bool confirmed)
+{
+        u8g2_ClearBuffer(pu8g2);
+        ui_draw_shutdown_progress_ring(pu8g2, 64, 29, progress_pct, confirmed);
+        ui_draw_shutdown_power_icon(pu8g2, 64, 29, confirmed);
+        ui_draw_centered_str_visible(pu8g2, 0, 61, confirmed ? "OFF" : "HOLD");
+}
+
 void ui_test(u8g2_t *pu8g2)
 {
 #if OLED_RAW_TEST_MODE
@@ -1598,9 +1654,8 @@ void ui_test(u8g2_t *pu8g2)
                 s_text_x = 4;
                 s_text_y0 = (short)(2 + ascent);
         }
-        oled_boot_splash_show(pu8g2);
+        oled_boot_splash_animate(pu8g2, UI_BOOT_IMAGE_MS);
         DBG_PRINTF("[ui_task] ui_test splash shown\n");
-        dly_ms(UI_BOOT_IMAGE_MS);
         DBG_PRINTF("[ui_task] ui_test delay done\n");
         frame_y = frame_y_trg = 0;
         ui_update_frame_target(pu8g2);
@@ -1689,17 +1744,9 @@ void ui_task(void *arg)
         for (;;) {
                 if (s_shutdown_prompt_show) {
                         const uint8_t pct = s_shutdown_prompt_progress_pct;
-                        const uint8_t bar_w = (uint8_t)((108u * pct) / 100u);
 
                         ui_config_deferred_save(true);
-                        u8g2_ClearBuffer(&u8g2);
-                        u8g2_DrawStr(&u8g2, 10, 22, "Power key pressed");
-                        if (s_shutdown_prompt_confirmed)
-                                u8g2_DrawStr(&u8g2, 10, 42, "Shutting down...");
-                        else
-                                u8g2_DrawStr(&u8g2, 10, 42, "Release to cancel");
-                        u8g2_DrawFrame(&u8g2, 10, 50, 108, 10);
-                        u8g2_DrawBox(&u8g2, 10, 50, bar_w, 10);
+                        ui_draw_shutdown_prompt(&u8g2, pct, s_shutdown_prompt_confirmed);
                         u8g2_SendBuffer(&u8g2);
                         delay_ms(60);
                         continue;

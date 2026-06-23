@@ -23,7 +23,10 @@
 #define TILT_ACTION_RATE_DPS           1.8f
 #define TILT_ACTION_REARM_RATE_DPS     0.8f
 #define TILT_ACTION_MAX_PITCH_DEG      30.0f
-#define TILT_ACTION_MAX_DYNACC_MG      160.0f
+#define TILT_ACTION_MAX_DYNACC_MG      120.0f
+#define TILT_ACTION_MAX_RAW_DYNACC_MG  120.0f
+#define TILT_ACTION_MAX_SAMPLE_STEP_MG 240.0f
+#define TILT_ACTION_CONFIRM_MS         90U
 #define TILT_STABLE_BASELINE_MS        300U
 #define TILT_STABLE_JITTER_DEG         1.0f
 #define SENSOR_ACTIVE_SAMPLE_MS        20U
@@ -90,6 +93,7 @@ static int8_t s_pose_roll_sign = 1;
 static tilt_action_state_t s_tilt_state = TILT_STATE_ARMED;
 static float s_tilt_ref_deg;
 static bool s_tilt_ref_valid;
+static uint32_t s_tilt_motion_since_ms;
 static float s_tilt_stable_candidate_deg;
 static uint32_t s_tilt_stable_since_ms;
 static bool s_tilt_stable_valid;
@@ -130,6 +134,7 @@ static void sensor_tilt_action_reset(void)
 	s_tilt_state = TILT_STATE_ARMED;
 	s_tilt_ref_deg = 0.0f;
 	s_tilt_ref_valid = false;
+	s_tilt_motion_since_ms = 0;
 	s_tilt_stable_candidate_deg = 0.0f;
 	s_tilt_stable_since_ms = 0;
 	s_tilt_stable_valid = false;
@@ -143,6 +148,7 @@ static void sensor_tilt_action_arm_at(float physical_tilt)
 	s_tilt_state = TILT_STATE_ARMED;
 	s_tilt_ref_deg = physical_tilt;
 	s_tilt_ref_valid = true;
+	s_tilt_motion_since_ms = 0;
 	s_tilt_stable_candidate_deg = physical_tilt;
 	s_tilt_stable_since_ms = HAL_GetTick();
 	s_tilt_stable_valid = true;
@@ -165,9 +171,40 @@ static void sensor_tilt_stable_track(float physical_tilt, uint32_t now_ms)
 	}
 }
 
+static bool sensor_tilt_action_ready_to_latch(uint32_t now_ms, float delta)
+{
+	return s_tilt_motion_since_ms != 0U &&
+	       delta >= TILT_ACTION_DELTA_DEG &&
+	       (uint32_t)(now_ms - s_tilt_motion_since_ms) >=
+	       TILT_ACTION_CONFIRM_MS;
+}
+
+static void sensor_tilt_action_latch(sensor_tilt_event_t event,
+				     float physical_tilt,
+				     float physical_screen,
+				     float delta,
+				     float physical_rate)
+{
+	const char *name = (event == SENSOR_TILT_EVENT_RIGHT) ? "right" : "left";
+
+	s_tilt_state = (event == SENSOR_TILT_EVENT_RIGHT) ?
+		       TILT_STATE_HELD_RIGHT : TILT_STATE_HELD_LEFT;
+	s_tilt_ref_deg = physical_tilt;
+	s_tilt_motion_since_ms = 0;
+	DBG_PRINTF("[tilt] %s tilt_x10=%d screen_x10=%d delta_x10=%d rate_x10=%d\n",
+		   name,
+		   (int)(physical_tilt * 10.0f),
+		   (int)(physical_screen * 10.0f),
+		   (int)(delta * 10.0f),
+		   (int)(physical_rate * 10.0f));
+	sensor_tilt_event_latch(event);
+}
+
 static void sensor_update_tilt_action(float roll_deg, float pitch_deg,
 				      float pitch_rate_dps,
-				      float dyn_acc_mg)
+				      float dyn_acc_mg,
+				      float raw_dyn_acc_mg,
+				      float sample_step_mg)
 {
 	const uint32_t now_ms = HAL_GetTick();
 	const float physical_tilt =
@@ -187,6 +224,14 @@ static void sensor_update_tilt_action(float roll_deg, float pitch_deg,
 		sensor_tilt_action_reset();
 		return;
 	}
+	if (raw_dyn_acc_mg > TILT_ACTION_MAX_RAW_DYNACC_MG) {
+		sensor_tilt_action_reset();
+		return;
+	}
+	if (sample_step_mg > TILT_ACTION_MAX_SAMPLE_STEP_MG) {
+		sensor_tilt_action_reset();
+		return;
+	}
 
 	if (!s_tilt_ref_valid) {
 		s_tilt_ref_deg = physical_tilt;
@@ -200,6 +245,26 @@ static void sensor_update_tilt_action(float roll_deg, float pitch_deg,
 	}
 
 	if (abs_rate <= TILT_ACTION_REARM_RATE_DPS) {
+		if (s_tilt_state == TILT_STATE_MOVING_RIGHT &&
+		    physical_tilt > TILT_ACTION_TRIGGER_DEG) {
+			const float delta =
+			    angle_delta_deg(physical_tilt, s_tilt_ref_deg);
+			if (sensor_tilt_action_ready_to_latch(now_ms, delta))
+				sensor_tilt_action_latch(SENSOR_TILT_EVENT_RIGHT,
+							 physical_tilt, physical_screen,
+							 delta, physical_rate);
+			return;
+		}
+		if (s_tilt_state == TILT_STATE_MOVING_LEFT &&
+		    physical_tilt < -TILT_ACTION_TRIGGER_DEG) {
+			const float delta =
+			    angle_delta_deg(s_tilt_ref_deg, physical_tilt);
+			if (sensor_tilt_action_ready_to_latch(now_ms, delta))
+				sensor_tilt_action_latch(SENSOR_TILT_EVENT_LEFT,
+							 physical_tilt, physical_screen,
+							 delta, physical_rate);
+			return;
+		}
 		sensor_tilt_stable_track(physical_tilt, now_ms);
 		return;
 	}
@@ -211,36 +276,32 @@ static void sensor_update_tilt_action(float roll_deg, float pitch_deg,
 		    angle_delta_deg(physical_tilt, s_tilt_ref_deg);
 		if (s_tilt_state == TILT_STATE_HELD_RIGHT)
 			return;
-		if (s_tilt_state != TILT_STATE_MOVING_RIGHT)
+		if (s_tilt_state != TILT_STATE_MOVING_RIGHT) {
 			s_tilt_state = TILT_STATE_MOVING_RIGHT;
-		if (delta < TILT_ACTION_DELTA_DEG)
+			s_tilt_motion_since_ms = now_ms;
 			return;
-		s_tilt_state = TILT_STATE_HELD_RIGHT;
-		s_tilt_ref_deg = physical_tilt;
-		DBG_PRINTF("[tilt] right tilt_x10=%d screen_x10=%d delta_x10=%d rate_x10=%d\n",
-			   (int)(physical_tilt * 10.0f),
-			   (int)(physical_screen * 10.0f),
-			   (int)(delta * 10.0f),
-			   (int)(physical_rate * 10.0f));
-		sensor_tilt_event_latch(SENSOR_TILT_EVENT_RIGHT);
+		}
+		if (!sensor_tilt_action_ready_to_latch(now_ms, delta))
+			return;
+		sensor_tilt_action_latch(SENSOR_TILT_EVENT_RIGHT,
+					 physical_tilt, physical_screen,
+					 delta, physical_rate);
 	} else if (physical_rate < -TILT_ACTION_RATE_DPS &&
 		   physical_tilt < -TILT_ACTION_TRIGGER_DEG) {
 		const float delta =
 		    angle_delta_deg(s_tilt_ref_deg, physical_tilt);
 		if (s_tilt_state == TILT_STATE_HELD_LEFT)
 			return;
-		if (s_tilt_state != TILT_STATE_MOVING_LEFT)
+		if (s_tilt_state != TILT_STATE_MOVING_LEFT) {
 			s_tilt_state = TILT_STATE_MOVING_LEFT;
-		if (delta < TILT_ACTION_DELTA_DEG)
+			s_tilt_motion_since_ms = now_ms;
 			return;
-		s_tilt_state = TILT_STATE_HELD_LEFT;
-		s_tilt_ref_deg = physical_tilt;
-		DBG_PRINTF("[tilt] left tilt_x10=%d screen_x10=%d delta_x10=%d rate_x10=%d\n",
-			   (int)(physical_tilt * 10.0f),
-			   (int)(physical_screen * 10.0f),
-			   (int)(delta * 10.0f),
-			   (int)(physical_rate * 10.0f));
-		sensor_tilt_event_latch(SENSOR_TILT_EVENT_LEFT);
+		}
+		if (!sensor_tilt_action_ready_to_latch(now_ms, delta))
+			return;
+		sensor_tilt_action_latch(SENSOR_TILT_EVENT_LEFT,
+					 physical_tilt, physical_screen,
+					 delta, physical_rate);
 	}
 }
 
@@ -375,6 +436,9 @@ static void sensor_update_attitude(float ax_mg, float ay_mg, float az_mg)
 {
 	const uint32_t now_ms = HAL_GetTick();
 	float dt_s = 0.0f;
+	float sample_step_mg = 0.0f;
+	const float raw_acc_norm = sqrtf(ax_mg * ax_mg + ay_mg * ay_mg + az_mg * az_mg);
+	const float raw_dyn_acc = fabsf(raw_acc_norm - 1000.0f);
 	if (s_last_update_ms != 0U && now_ms > s_last_update_ms) {
 		dt_s = (float)(now_ms - s_last_update_ms) / 1000.0f;
 	}
@@ -385,6 +449,12 @@ static void sensor_update_attitude(float ax_mg, float ay_mg, float az_mg)
 		s_ay_f = ay_mg;
 		s_az_f = az_mg;
 		s_att_valid = true;
+	} else {
+		const float dx = ax_mg - s_ax_f;
+		const float dy = ay_mg - s_ay_f;
+		const float dz = az_mg - s_az_f;
+
+		sample_step_mg = sqrtf(dx * dx + dy * dy + dz * dz);
 	}
 
 	s_ax_f += ATT_LPF_ALPHA * (ax_mg - s_ax_f);
@@ -417,7 +487,7 @@ static void sensor_update_attitude(float ax_mg, float ay_mg, float az_mg)
 	                 (pitch_rate_dps > ROTATION_RATE_THRESHOLD_DPS) ||
 	                 (dyn_acc > ROTATION_DYNACC_THRESHOLD_MG);
 	sensor_update_tilt_action(roll_deg, pitch_deg, pitch_rate_signed_dps,
-				  dyn_acc);
+				  dyn_acc, raw_dyn_acc, sample_step_mg);
 
 }
 

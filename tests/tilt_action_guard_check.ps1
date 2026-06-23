@@ -49,6 +49,20 @@ Assert-Contains $sensor "TILT_ACTION_MAX_DYNACC_MG" `
     "tilt action must reject whole-device lift or shake acceleration"
 Assert-Contains $sensor "dyn_acc_mg\s*>\s*TILT_ACTION_MAX_DYNACC_MG" `
     "linear lift acceleration must not trigger left/right menu events"
+Assert-Contains $sensor "TILT_ACTION_MAX_RAW_DYNACC_MG" `
+    "tilt action must reject raw up/down shake before filtering hides it"
+Assert-Contains $sensor "raw_dyn_acc_mg\s*>\s*TILT_ACTION_MAX_RAW_DYNACC_MG" `
+    "raw vertical shake must not trigger left/right menu events"
+Assert-Contains $sensor "TILT_ACTION_MAX_SAMPLE_STEP_MG" `
+    "tilt action must reject translational shake spikes"
+Assert-Contains $sensor "sample_step_mg\s*>\s*TILT_ACTION_MAX_SAMPLE_STEP_MG" `
+    "parallel shake step changes must not trigger left/right menu events"
+Assert-Contains $sensor "TILT_ACTION_CONFIRM_MS" `
+    "tilt action must require a short continuous candidate before latching"
+Assert-Contains $sensor "s_tilt_motion_since_ms" `
+    "tilt action must remember when a candidate motion started"
+Assert-Contains $sensor "sensor_tilt_action_ready_to_latch" `
+    "tilt action must use a confirmation helper before latching an event"
 Assert-NotContains $sensor "s_tilt_state\s*=\s*TILT_STATE_HELD_RIGHT;\s*if\s*\(roll_rate_dps" `
     "right tilt must not enter HELD before confirming right-down motion"
 Assert-NotContains $sensor "s_tilt_state\s*=\s*TILT_STATE_HELD_LEFT;\s*if\s*\(roll_rate_dps" `
@@ -63,9 +77,13 @@ $alphaMatch = [regex]::Match($sensor, '#define\s+ATT_LPF_ALPHA\s+([0-9.]+)f')
 $sampleMatch = [regex]::Match($sensor, '#define\s+SENSOR_ACTIVE_SAMPLE_MS\s+(\d+)U')
 $watermarkMatch = [regex]::Match($sensor, '#define\s+SENSOR_FIFO_WTM_ACTIVE\s+(\d+)U')
 $dynMatch = [regex]::Match($sensor, '#define\s+TILT_ACTION_MAX_DYNACC_MG\s+([0-9.]+)f')
+$rawDynMatch = [regex]::Match($sensor, '#define\s+TILT_ACTION_MAX_RAW_DYNACC_MG\s+([0-9.]+)f')
+$stepMatch = [regex]::Match($sensor, '#define\s+TILT_ACTION_MAX_SAMPLE_STEP_MG\s+([0-9.]+)f')
+$confirmMatch = [regex]::Match($sensor, '#define\s+TILT_ACTION_CONFIRM_MS\s+(\d+)U')
 if (-not $triggerMatch.Success -or -not $deltaMatch.Success -or -not $rateMatch.Success -or
     -not $alphaMatch.Success -or -not $sampleMatch.Success -or -not $watermarkMatch.Success -or
-    -not $dynMatch.Success) {
+    -not $dynMatch.Success -or -not $rawDynMatch.Success -or -not $stepMatch.Success -or
+    -not $confirmMatch.Success) {
     throw "tilt action thresholds were not found"
 }
 
@@ -95,6 +113,18 @@ if ([int]$watermarkMatch.Groups[1].Value -gt 2) {
 
 if ([double]$dynMatch.Groups[1].Value -gt 180.0) {
     throw "linear acceleration rejection must be strict enough to ignore upward lift"
+}
+
+if ([double]$rawDynMatch.Groups[1].Value -gt 140.0) {
+    throw "raw acceleration rejection must be strict enough to catch vertical shake"
+}
+
+if ([double]$stepMatch.Groups[1].Value -gt 260.0) {
+    throw "sample-step rejection must be strict enough to catch parallel shake"
+}
+
+if ([int]$confirmMatch.Groups[1].Value -lt 60 -or [int]$confirmMatch.Groups[1].Value -gt 140) {
+    throw "tilt confirmation time must filter shake without making gestures feel slow"
 }
 
 Assert-Contains $display "event\s*==\s*SENSOR_TILT_EVENT_RIGHT\)\s*\r?\n\s*delta\s*=\s*1" `

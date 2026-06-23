@@ -229,17 +229,62 @@ void u8g2Init(u8g2_t* u8g2)
         DBG_PRINTF("[oled] init end\n");
 }
 
+static void oled_boot_splash_draw_frame(u8g2_t* u8g2, uint8_t frame)
+{
+        const uint8_t arc_start = (uint8_t)(frame * 17U);
+        const uint8_t arc_end = (uint8_t)(arc_start + 70U);
+        const uint8_t pulse_x = (uint8_t)(18U + ((uint16_t)frame * 7U) % 76U);
+        const uint8_t dot_phase = (uint8_t)(frame % 3U);
+
+        u8g2_ClearBuffer(u8g2);
+        u8g2_DrawXBMP(u8g2, 0, 0, anime_eyes_w, anime_eyes_h, anime_eyes_bits);
+        u8g2_DrawCircle(u8g2, 111, 51, 8, U8G2_DRAW_ALL);
+        u8g2_DrawArc(u8g2, 111, 51, 8, arc_start, arc_end);
+        u8g2_DrawArc(u8g2, 111, 51, 7, arc_start, arc_end);
+
+        for (uint8_t x = 18U; x <= 106U; x = (uint8_t)(x + 4U))
+                u8g2_DrawPixel(u8g2, x, 62);
+        u8g2_DrawHLine(u8g2, pulse_x, 62, 16);
+
+        for (uint8_t i = 0U; i < 3U; i++) {
+                const uint8_t r = (i == dot_phase) ? 2U : 1U;
+                u8g2_DrawDisc(u8g2, (u8g2_uint_t)(55U + i * 9U), 56, r, U8G2_DRAW_ALL);
+        }
+}
+
 void oled_boot_splash_show(u8g2_t* u8g2)
 {
+        static uint8_t frame;
+
         if (u8g2 == NULL)
                 return;
 
         /* 开机图：显示转换后的 128x64 XBM 图片。 */
         DBG_PRINTF("[oled] splash begin\n");
-        u8g2_ClearBuffer(u8g2);
-        u8g2_DrawXBMP(u8g2, 0, 0, anime_eyes_w, anime_eyes_h, anime_eyes_bits);
+        oled_boot_splash_draw_frame(u8g2, frame++);
         u8g2_SendBuffer(u8g2);
         DBG_PRINTF("[oled] splash end\n");
+}
+
+void oled_boot_splash_animate(u8g2_t* u8g2, uint16_t duration_ms)
+{
+        uint16_t elapsed_ms = 0;
+        uint8_t frame = 0;
+        const uint16_t frame_ms = 70U;
+
+        if (u8g2 == NULL)
+                return;
+
+        DBG_PRINTF("[oled] splash animation begin\n");
+        do {
+                oled_boot_splash_draw_frame(u8g2, frame++);
+                u8g2_SendBuffer(u8g2);
+                if ((uint16_t)(elapsed_ms + frame_ms) >= duration_ms)
+                        break;
+                delay_ms(frame_ms);
+                elapsed_ms = (uint16_t)(elapsed_ms + frame_ms);
+        } while (elapsed_ms < duration_ms);
+        DBG_PRINTF("[oled] splash animation end\n");
 }
 
 void oled_raw_white_test(u8g2_t* u8g2)
