@@ -57,3 +57,18 @@ Output files are in `.pio/build/genericSTM32F103RC/`:
 - `Ems_<version>.hex` — Intel HEX (recommended for flashing)
 - `Ems_<version>.bin` — Raw binary
 - `Ems_<version>.elf` — ELF (for debugging)
+
+## OTA Builds
+
+The two-stage OTA build uses separate PlatformIO environments:
+
+```bash
+pio run -e bootloader
+pio run -e app
+```
+
+Flash the bootloader at `0x08000000`. The app image is linked for
+`0x08008000`. The USART1 text OTA protocol accepts `OTA BEGIN`, `OTA DATA`,
+`OTA END`, `OTA APPLY`, `OTA ABORT`, and `OTA STATUS?`. OTA images are staged
+in W25Q16 before the bootloader installs them into the internal Flash app
+partition.
