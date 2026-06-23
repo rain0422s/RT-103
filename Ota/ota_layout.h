@@ -1,0 +1,30 @@
+#ifndef OTA_LAYOUT_H
+#define OTA_LAYOUT_H
+
+#include <stdint.h>
+
+#define OTA_BOOTLOADER_BASE        0x08000000UL
+#define OTA_BOOTLOADER_SIZE        0x00008000UL
+#define OTA_APP_BASE               0x08008000UL
+#define OTA_APP_SIZE               0x00038000UL
+#define OTA_FLASH_END              0x08040000UL
+
+#define OTA_SRAM_BASE              0x20000000UL
+#define OTA_SRAM_SIZE              0x0000C000UL
+#define OTA_SRAM_END               (OTA_SRAM_BASE + OTA_SRAM_SIZE)
+
+#define OTA_EXT_FLASH_SIZE         0x00200000UL
+#define OTA_W25Q_SECTOR_SIZE       0x00001000UL
+#define OTA_W25Q_PAGE_SIZE         0x00000100UL
+#define OTA_MANIFEST_ADDR          0x00000000UL
+#define OTA_IMAGE_ADDR             0x00001000UL
+#define OTA_IMAGE_SLOT_SIZE        0x00040000UL
+#define OTA_LFS_BASE               0x00041000UL
+#define OTA_LFS_BLOCK_SIZE         0x00001000UL
+#define OTA_LFS_OFFSET_BLOCKS      65UL
+#define OTA_LFS_BLOCK_COUNT        447UL
+#define OTA_OLD_LFS_OFFSET_BLOCKS  3UL
+
+#define OTA_TRANSFER_MAX_DATA_LEN  16UL
+
+#endif
