@@ -18,6 +18,72 @@ function Assert-Contains($Text, $Pattern, $Message) {
     }
 }
 
+function Get-NativeCCompiler {
+    $compiler = Get-Command gcc, clang, cl -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($null -eq $compiler) {
+        return $null
+    }
+    return $compiler
+}
+
+function Invoke-CrcVectorCheck {
+    param(
+        [Parameter(Mandatory = $true)]
+        $Compiler,
+        [Parameter(Mandatory = $true)]
+        [string]$Root
+    )
+
+    $tempDir = Join-Path ([System.IO.Path]::GetTempPath()) ("ota_crc_guard_" + [System.Guid]::NewGuid().ToString("N"))
+    New-Item -ItemType Directory -Path $tempDir | Out-Null
+    try {
+        $testSource = Join-Path $tempDir "ota_crc_guard.c"
+        $testExe = Join-Path $tempDir "ota_crc_guard.exe"
+        $crcSource = Join-Path $Root "Ota\ota_crc32.c"
+        $includeDir = Join-Path $Root "Ota"
+        @'
+#include "ota_crc32.h"
+
+#include <stdint.h>
+#include <stdio.h>
+#include <string.h>
+
+int main(void)
+{
+    const char *text = "123456789";
+    uint32_t empty_crc = ota_crc32_compute("", 0U);
+    uint32_t text_crc = ota_crc32_compute(text, (uint32_t)strlen(text));
+
+    if (empty_crc != 0x00000000UL) {
+        fprintf(stderr, "empty crc mismatch: 0x%08lX\n", (unsigned long)empty_crc);
+        return 1;
+    }
+    if (text_crc != 0xCBF43926UL) {
+        fprintf(stderr, "123456789 crc mismatch: 0x%08lX\n", (unsigned long)text_crc);
+        return 1;
+    }
+    return 0;
+}
+'@ | Set-Content -Path $testSource -Encoding ASCII
+
+        if ($Compiler.Name -eq "cl.exe") {
+            & $Compiler.Source /nologo /W4 /I"$includeDir" $testSource $crcSource /Fe"$testExe" | Out-String | Write-Verbose
+        } else {
+            & $Compiler.Source -std=c99 -Wall -Wextra -I"$includeDir" $testSource $crcSource -o $testExe
+        }
+        if ($LASTEXITCODE -ne 0) {
+            throw "CRC vector host build failed with $($Compiler.Name)"
+        }
+
+        & $testExe
+        if ($LASTEXITCODE -ne 0) {
+            throw "CRC vector host check failed"
+        }
+    } finally {
+        Remove-Item -Recurse -Force -Path $tempDir -ErrorAction SilentlyContinue
+    }
+}
+
 $layout = Read-Text $layoutPath
 $crcHeader = Read-Text $crcHeaderPath
 $crcSource = Read-Text $crcSourcePath
@@ -50,6 +116,12 @@ Assert-Contains $crcHeader "uint32_t\s+ota_crc32_compute\s*\(const void \*data,\
 Assert-Contains $crcSource "return\s+0xFFFFFFFFUL" "crc32 begin must initialize to all bits set"
 Assert-Contains $crcSource "0xEDB88320UL" "crc32 must use reflected Ethernet polynomial"
 Assert-Contains $crcSource "\^ 0xFFFFFFFFUL" "crc32 finish must xor final value"
-Assert-Contains $crcSource "return\s+ota_crc32_finish\s*\(\s*ota_crc32_update\s*\(\s*ota_crc32_begin\s*\(\s*\)\s*,\s*data\s*,\s*len\s*\)\s*\)" "crc compute must wrap begin/update/finish"
+
+$compiler = Get-NativeCCompiler
+if ($null -eq $compiler) {
+    Write-Warning "No native C compiler found; CRC vector check skipped"
+} else {
+    Invoke-CrcVectorCheck -Compiler $compiler -Root $root
+}
 
 Write-Output "OTA layout and CRC guard OK"
