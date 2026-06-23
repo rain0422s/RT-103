@@ -6,6 +6,7 @@
 
 #define OTA_MANIFEST_MAGIC   0x3141544FUL
 #define OTA_MANIFEST_VERSION 1U
+#define OTA_MANIFEST_SIZE    40U
 
 typedef enum {
         OTA_MANIFEST_STATE_IDLE = 0,
@@ -29,6 +30,9 @@ typedef struct {
         uint32_t sequence;
         uint32_t manifest_crc32;
 } ota_manifest_t;
+
+_Static_assert(sizeof(ota_manifest_t) == OTA_MANIFEST_SIZE,
+               "ota_manifest_t size must remain fixed");
 
 void ota_manifest_init(ota_manifest_t *manifest);
 uint32_t ota_manifest_crc(const ota_manifest_t *manifest);

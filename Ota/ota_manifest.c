@@ -4,6 +4,12 @@
 #include "ota_layout.h"
 #include <string.h>
 
+static bool ota_manifest_state_is_known(uint32_t state)
+{
+        return state >= OTA_MANIFEST_STATE_IDLE &&
+               state <= OTA_MANIFEST_STATE_ERROR;
+}
+
 void ota_manifest_init(ota_manifest_t *manifest)
 {
         if (manifest == 0)
@@ -46,6 +52,8 @@ bool ota_manifest_is_valid(const ota_manifest_t *manifest)
         if (manifest->version != OTA_MANIFEST_VERSION)
                 return false;
         if (manifest->header_size != (uint16_t)sizeof(*manifest))
+                return false;
+        if (!ota_manifest_state_is_known(manifest->state))
                 return false;
         if (manifest->target_app_addr != OTA_APP_BASE)
                 return false;
