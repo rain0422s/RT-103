@@ -1,12 +1,23 @@
 #include "w25qxx.h"
+
+#ifndef W25QXX_USE_FREERTOS
+#define W25QXX_USE_FREERTOS 1
+#endif
+
+#if W25QXX_USE_FREERTOS
 #include "FreeRTOS.h"
 #include "task.h"
+#endif
 
 static void w25qxx_poll_delay(void)
 {
+#if W25QXX_USE_FREERTOS
         if (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING) {
                 vTaskDelay(pdMS_TO_TICKS(1));
+                return;
         }
+#endif
+        HAL_Delay(1);
 }
 
 static uint8_t w25qxx_wait_ready(uint32_t timeout_ms)
