@@ -1,4 +1,5 @@
 #include "boot_jump.h"
+#include "boot_ota.h"
 #include "gpio.h"
 #include "spi.h"
 #include "stm32f1xx_hal.h"
@@ -37,6 +38,7 @@ int main(void)
 	MX_GPIO_Init();
 	MX_SPI1_Init();
 	w25qxx_reset();
+	(void)boot_ota_apply_if_pending();
 
 	if (boot_app_is_valid())
 		boot_jump_to_app();
