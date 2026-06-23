@@ -1,11 +1,18 @@
 #include "lfs.h"
 #include "w25qxx.h"
 #include "lfs_port.h"
+#include "ota_layout.h"
 #include "utils.h"
 #include "FreeRTOS.h"
 #include "semphr.h"
-#define OFFSETBLOCK 		3
 #define LFS_PORT_FILE_MAX      4096U
+
+static uint32_t s_lfs_offset_blocks = OTA_LFS_OFFSET_BLOCKS;
+
+static uint32_t lfs_block_addr(const struct lfs_config *c, lfs_block_t block, lfs_off_t off)
+{
+        return (uint32_t)((s_lfs_offset_blocks + (uint32_t)block) * c->block_size + off);
+}
 /**
  * lfs与底层flash读数据接口
  * @param  c
@@ -17,7 +24,7 @@
  */
 static int lfs_deskio_read(const struct lfs_config *c, lfs_block_t block, lfs_off_t off, void *buffer, lfs_size_t size)
 {
-	if(W25Qx_OK == w25qxx_read((uint8_t *)buffer, c->block_size * (OFFSETBLOCK+block) + off, size))
+	if(W25Qx_OK == w25qxx_read((uint8_t *)buffer, lfs_block_addr(c, block, off), size))
                 return LFS_ERR_OK;
         else
                 return LFS_ERR_IO;
@@ -35,7 +42,7 @@ static int lfs_deskio_read(const struct lfs_config *c, lfs_block_t block, lfs_of
 static int lfs_deskio_prog(const struct lfs_config *c, lfs_block_t block, lfs_off_t off, const void *buffer, lfs_size_t size)
 {
 
-        if(W25Qx_OK == w25qxx_write((uint8_t *)buffer, c->block_size * (OFFSETBLOCK+block) + off, size))
+        if(W25Qx_OK == w25qxx_write((uint8_t *)buffer, lfs_block_addr(c, block, off), size))
                 return LFS_ERR_OK;
         else
                 return LFS_ERR_IO;
@@ -51,9 +58,8 @@ static int lfs_deskio_erase(const struct lfs_config *c, lfs_block_t block)
 {
         DBG_PRINTF("block:%lu,i:%lu",
                    (unsigned long)block,
-                   (unsigned long)((OFFSETBLOCK + block) * c->block_size));
-	if(W25Qx_OK == w25qxx_erase_block((OFFSETBLOCK+block)*c->block_size))
-	// int ret = w25qxx_erase_block((OFFSETBLOCK+block));
+                   (unsigned long)lfs_block_addr(c, block, 0));
+	if(W25Qx_OK == w25qxx_erase_block(lfs_block_addr(c, block, 0)))
                 return LFS_ERR_OK;
         else
                 return LFS_ERR_IO;
@@ -118,7 +124,7 @@ const struct lfs_config lfs_w25qxx_cfg =
         .read_size = 256,
         .prog_size = 256,
         .block_size = 4096,
-        .block_count = 512,
+        .block_count = OTA_LFS_BLOCK_COUNT,
         .cache_size = 256,
         .lookahead_size = 128,
         .block_cycles = 500,
@@ -129,6 +135,37 @@ const struct lfs_config lfs_w25qxx_cfg =
         // .context=512,
 
         // 使用静态内存必须设置这几个缓存
+
+        .read_buffer = read_buffer,
+        .prog_buffer = prog_buffer,
+        .lookahead_buffer = lookahead_buffer,
+};
+
+static const struct lfs_config lfs_w25qxx_old_cfg =
+{
+        // block device operations
+        .read  = lfs_deskio_read,
+        .prog  = lfs_deskio_prog,
+        .erase = lfs_deskio_erase,
+        .sync  = lfs_deskio_sync,
+        .lock  = lfs_port_lock,
+        .unlock = lfs_port_unlock,
+
+        // block device configuration
+        .read_size = 256,
+        .prog_size = 256,
+        .block_size = 4096,
+        .block_count = OTA_OLD_LFS_BLOCK_COUNT,
+        .cache_size = 256,
+        .lookahead_size = 128,
+        .block_cycles = 500,
+
+        .name_max=128,
+        .file_max=LFS_PORT_FILE_MAX,
+        .attr_max=128,
+        // .context=512,
+
+        // 浣跨敤闈欐€佸唴瀛樺繀椤昏缃繖鍑犱釜缂撳瓨
 
         .read_buffer = read_buffer,
         .prog_buffer = prog_buffer,
@@ -159,6 +196,129 @@ static lfs_t s_lfs;
 static int s_mounted = 0;
 static int s_ready = 0;
 static uint32_t s_boot_count = 0;
+static uint8_t s_lfs_migrate_buffer[LFS_PORT_FILE_MAX];
+static int s_lfs_migration_checked;
+
+static const char *const s_lfs_migrate_files[] = {
+        "boot_count",
+        "battery_hist",
+        "uptime_ckpt",
+};
+
+static int lfs_mount_raw_at(uint32_t offset_blocks, const struct lfs_config *cfg)
+{
+        s_lfs_offset_blocks = offset_blocks;
+        return lfs_mount(&s_lfs, cfg);
+}
+
+static void lfs_force_unmount_raw(void)
+{
+        (void)lfs_unmount(&s_lfs);
+        s_mounted = 0;
+        s_ready = 0;
+}
+
+static lfs_ssize_t lfs_read_migrate_file(const char *path)
+{
+        lfs_file_t file;
+        lfs_soff_t file_size;
+        lfs_ssize_t read_len;
+        int err;
+
+        err = lfs_mount_raw_at(OTA_OLD_LFS_OFFSET_BLOCKS, &lfs_w25qxx_old_cfg);
+        if (err < 0) {
+                lfs_force_unmount_raw();
+                return err;
+        }
+
+        err = lfs_file_open(&s_lfs, &file, path, LFS_O_RDONLY);
+        if (err < 0) {
+                lfs_force_unmount_raw();
+                return err;
+        }
+
+        file_size = lfs_file_size(&s_lfs, &file);
+        if (file_size < 0 || file_size > (lfs_soff_t)sizeof(s_lfs_migrate_buffer)) {
+                (void)lfs_file_close(&s_lfs, &file);
+                lfs_force_unmount_raw();
+                return LFS_ERR_NOMEM;
+        }
+
+        read_len = lfs_file_read(&s_lfs, &file, s_lfs_migrate_buffer, (lfs_size_t)file_size);
+        (void)lfs_file_close(&s_lfs, &file);
+        lfs_force_unmount_raw();
+        return read_len;
+}
+
+static int lfs_write_migrate_file(const char *path, lfs_size_t size)
+{
+        lfs_file_t file;
+        lfs_ssize_t written = 0;
+        int err;
+
+        err = lfs_mount_raw_at(OTA_LFS_OFFSET_BLOCKS, &lfs_w25qxx_cfg);
+        if (err < 0) {
+                lfs_force_unmount_raw();
+                return err;
+        }
+
+        err = lfs_file_open(&s_lfs, &file, path, LFS_O_WRONLY | LFS_O_CREAT | LFS_O_TRUNC);
+        if (err < 0) {
+                lfs_force_unmount_raw();
+                return err;
+        }
+
+        if (size > 0)
+                written = lfs_file_write(&s_lfs, &file, s_lfs_migrate_buffer, size);
+        err = lfs_file_close(&s_lfs, &file);
+        lfs_force_unmount_raw();
+        if (err < 0)
+                return err;
+        return (written == (lfs_ssize_t)size) ? 0 : LFS_ERR_IO;
+}
+
+int lfs_migrate_from_old_offset(void)
+{
+        int err;
+        int formatted_new = 0;
+
+        if (s_lfs_migration_checked)
+                return 0;
+        s_lfs_migration_checked = 1;
+
+        if (lfs_mount_raw_at(OTA_LFS_OFFSET_BLOCKS, &lfs_w25qxx_cfg) == 0) {
+                lfs_force_unmount_raw();
+                return 0;
+        }
+        lfs_force_unmount_raw();
+
+        err = lfs_mount_raw_at(OTA_OLD_LFS_OFFSET_BLOCKS, &lfs_w25qxx_old_cfg);
+        lfs_force_unmount_raw();
+        if (err < 0) {
+                s_lfs_offset_blocks = OTA_LFS_OFFSET_BLOCKS;
+                return 0;
+        }
+
+        for (unsigned int i = 0; i < sizeof(s_lfs_migrate_files) / sizeof(s_lfs_migrate_files[0]); i++) {
+                lfs_ssize_t read_len = lfs_read_migrate_file(s_lfs_migrate_files[i]);
+                if (read_len < 0)
+                        continue;
+
+                if (!formatted_new) {
+                        s_lfs_offset_blocks = OTA_LFS_OFFSET_BLOCKS;
+                        err = lfs_format(&s_lfs, &lfs_w25qxx_cfg);
+                        if (err < 0)
+                                break;
+                        formatted_new = 1;
+                }
+
+                (void)lfs_write_migrate_file(s_lfs_migrate_files[i], (lfs_size_t)read_len);
+        }
+
+        lfs_force_unmount_raw();
+        s_lfs_offset_blocks = OTA_LFS_OFFSET_BLOCKS;
+        return 0;
+}
 
 static int lfs_write_boot_count_value(uint32_t boot_count)
 {
@@ -279,6 +439,7 @@ uint32_t lfs_get_boot_count(void)
 int lfs_first_run(void)
 {
         lfs_file_t file;
+        (void)lfs_migrate_from_old_offset();
         int err = lfs_mount_fs();
         if (err)
                 return err;

@@ -13,6 +13,7 @@ int lfs_unmount_fs(void);
 lfs_t *lfs_get(void);
 int lfs_is_ready(void);
 
+int lfs_migrate_from_old_offset(void);
 int lfs_first_run(void);
 uint32_t lfs_get_boot_count(void);
 
