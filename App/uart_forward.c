@@ -7,6 +7,7 @@
 #include "storage.h"
 #include "sensor.h"
 #include "display.h"
+#include "ota_update.h"
 #include "FreeRTOS.h"
 #include "task.h"
 #include "queue.h"
@@ -78,6 +79,12 @@ static void uart_reply(const char *fmt, ...)
 	if (len >= (int)sizeof(buf))
 		len = (int)sizeof(buf) - 1;
 	(void)HAL_UART_Transmit(&huart1, (uint8_t *)buf, (uint16_t)len, 200);
+}
+
+static void uart_ota_reply(const char *text, void *ctx)
+{
+	(void)ctx;
+	uart_reply("%s\r\n", text);
 }
 
 static const char *uart_skip_spaces(const char *s)
@@ -277,7 +284,12 @@ static void uart_process_command(char *line)
 	if (line[0] == '\0')
 		return;
 	if (strcmp(line, "HELP") == 0 || strcmp(line, "?") == 0) {
-		uart_reply("OK CMDS TIME=HH:MM:SS GET TIME GET BAT GET ATT BATCAL=V BATGAIN=N BATOFF=N POSECAL POSESIGN=+1/-1\r\n");
+		uart_reply("OK CMDS OTA HELP TIME=HH:MM:SS GET TIME GET BAT GET ATT BATCAL=V BATGAIN=N BATOFF=N POSECAL POSESIGN=+1/-1\r\n");
+		return;
+	}
+	if (strncmp(line, "OTA ", 4) == 0) {
+		if (!ota_command_process(line, uart_ota_reply, NULL))
+			uart_reply("ERR OTA unknown\r\n");
 		return;
 	}
 	if (strcmp(line, "GET TIME") == 0 || strcmp(line, "TIME?") == 0) {
