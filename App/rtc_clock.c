@@ -1,5 +1,7 @@
 #include "rtc_clock.h"
 #include "stm32f1xx_hal.h"
+#include "FreeRTOS.h"
+#include "task.h"
 
 #define RTC_CLOCK_BKP_MARKER       0xA55Au
 #define RTC_CLOCK_LSE_FALLBACK_MS  15000u
@@ -220,11 +222,18 @@ static uint32_t rtc_clock_get_uptime_base(const eeprom_config_t *cfg)
         return cfg->rtc_uptime_seconds;
 }
 
+static uint32_t rtc_clock_uptime_tick_ms(void)
+{
+        if (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING)
+                return (uint32_t)(xTaskGetTickCount() * portTICK_PERIOD_MS);
+        return HAL_GetTick();
+}
+
 static uint32_t rtc_clock_get_uptime_elapsed_seconds(void)
 {
         if (!s_uptime_anchor_valid)
-                return HAL_GetTick() / 1000u;
-        return (uint32_t)(HAL_GetTick() - s_uptime_anchor_tick_ms) / 1000u;
+                return rtc_clock_uptime_tick_ms() / 1000u;
+        return (uint32_t)(rtc_clock_uptime_tick_ms() - s_uptime_anchor_tick_ms) / 1000u;
 }
 
 uint32_t rtc_clock_get_uptime_seconds(const eeprom_config_t *cfg)
@@ -235,7 +244,7 @@ uint32_t rtc_clock_get_uptime_seconds(const eeprom_config_t *cfg)
 void rtc_clock_uptime_sync(const eeprom_config_t *cfg)
 {
         (void)cfg;
-        s_uptime_anchor_tick_ms = HAL_GetTick();
+        s_uptime_anchor_tick_ms = rtc_clock_uptime_tick_ms();
         s_uptime_anchor_valid = true;
 }
 

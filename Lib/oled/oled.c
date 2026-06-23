@@ -39,31 +39,17 @@ static const uint8_t s_oled_internal_dcdc_fix_seq[] = {
 
 static HAL_StatusTypeDef oled_spi3_tx(uint8_t *buf, uint16_t len)
 {
-    const uint16_t dma_threshold = 32U;
-    const uint32_t timeout_ms = 1000U;
-    const uint32_t start = HAL_GetTick();
+    const uint32_t timeout_ms = 100U;
+    HAL_StatusTypeDef status;
 
     if (buf == NULL || len == 0U) {
         return HAL_ERROR;
     }
 
-    /* DMA setup/wait overhead is higher for tiny packets. */
-    if (len <= dma_threshold) {
-        return HAL_SPI_Transmit(&hspi3, buf, len, timeout_ms);
-    }
-
-    if (HAL_SPI_Transmit_DMA(&hspi3, buf, len) != HAL_OK) {
-        return HAL_ERROR;
-    }
-
-    while (HAL_SPI_GetState(&hspi3) != HAL_SPI_STATE_READY) {
-        if ((HAL_GetTick() - start) > timeout_ms) {
-            (void)HAL_SPI_Abort(&hspi3);
-            return HAL_TIMEOUT;
-        }
-    }
-
-    return HAL_OK;
+    status = HAL_SPI_Transmit(&hspi3, buf, len, timeout_ms);
+    if (status != HAL_OK)
+        (void)HAL_SPI_Abort(&hspi3);
+    return status;
 }
 
 static void oled_hw_init(void)
@@ -228,14 +214,19 @@ uint8_t u8x8_gpio_and_delay(u8x8_t* u8x8, uint8_t msg, uint8_t arg_int, void* ar
 
 void u8g2Init(u8g2_t* u8g2)
 {
+        DBG_PRINTF("[oled] init begin\n");
         /* 使用 u8g2 提供的 SH1106 SPI noname 封装初始化。 */
         /* U8G2_R2: rotate 180° (screen upside down). */
         u8g2_Setup_sh1106_128x64_noname_f(u8g2, U8G2_R2, u8x8_byte_hw_spi3, u8x8_gpio_and_delay);
+        DBG_PRINTF("[oled] setup done\n");
         u8g2_InitDisplay(u8g2);
+        DBG_PRINTF("[oled] init display done\n");
         u8x8_cad_SendSequence(&u8g2->u8x8, s_oled_internal_dcdc_fix_seq);
+        DBG_PRINTF("[oled] dcdc seq done\n");
         u8g2_SetPowerSave(u8g2, 0); 
         u8g2_ClearBuffer(u8g2);
         u8g2_SetContrast(u8g2, 0xFF);
+        DBG_PRINTF("[oled] init end\n");
 }
 
 void oled_boot_splash_show(u8g2_t* u8g2)
@@ -244,9 +235,11 @@ void oled_boot_splash_show(u8g2_t* u8g2)
                 return;
 
         /* 开机图：显示转换后的 128x64 XBM 图片。 */
+        DBG_PRINTF("[oled] splash begin\n");
         u8g2_ClearBuffer(u8g2);
         u8g2_DrawXBMP(u8g2, 0, 0, anime_eyes_w, anime_eyes_h, anime_eyes_bits);
         u8g2_SendBuffer(u8g2);
+        DBG_PRINTF("[oled] splash end\n");
 }
 
 void oled_raw_white_test(u8g2_t* u8g2)

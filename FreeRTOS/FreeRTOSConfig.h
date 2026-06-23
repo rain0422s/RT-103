@@ -19,9 +19,9 @@
 // 任务最大优先级：通常 10~15 足够；越大越占用更多内核数据结构（ready list 等）
 #define configMAX_PRIORITIES                    12
 // 任务最小栈大小
-#define configMINIMAL_STACK_SIZE                64
+#define configMINIMAL_STACK_SIZE                128
 // FreeRTOS 堆空间（48KB RAM 约用 30% 时可适当增大；16KB 仍留足余量）
-#define configTOTAL_HEAP_SIZE                   16384
+#define configTOTAL_HEAP_SIZE                   24576
 // 任务名称最大长度
 #define configMAX_TASK_NAME_LEN                 16
 // 系统节拍计数器的变量类型，即定义portTickType是表示16位变量还是32位变量。
@@ -41,9 +41,9 @@
 // 是否使用TICK嘀嗒钩子函数
 #define configUSE_TICK_HOOK                     0
 // 是否使用栈溢出检查
-#define configCHECK_FOR_STACK_OVERFLOW          0
+#define configCHECK_FOR_STACK_OVERFLOW          2
 // 是否使用内存申请失败钩子函数
-#define configUSE_MALLOC_FAILED_HOOK            0
+#define configUSE_MALLOC_FAILED_HOOK            1
 // 是否使用软件定时器
 #define configUSE_TIMERS                        1
 // 设置软件定时器服务/守护进程的优先级（提高以减少闪烁/呼吸灯被抢占）
@@ -51,7 +51,7 @@
 // 设置软件定时器命令队列的长度
 #define configTIMER_QUEUE_LENGTH                10
 // 设置软件定时器服务/守护进程任务的堆栈深度
-#define configTIMER_TASK_STACK_DEPTH            configMINIMAL_STACK_SIZE
+#define configTIMER_TASK_STACK_DEPTH            256
 // STM32的最低优先级
 #define configLIBRARY_LOWEST_INTERRUPT_PRIORITY   15
 #define configSUPPORT_DYNAMIC_ALLOCATION  1
@@ -78,4 +78,3 @@
 #define INCLUDE_xTimerPendFunctionCall          1
 
 #endif  /* FREERTOS_CONFIG_H__ */
-

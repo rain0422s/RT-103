@@ -11,6 +11,7 @@ int lfs_unmount_fs(void);
 
 /** 获取已挂载的 lfs 指针，供读写文件用；未挂载返回 NULL */
 lfs_t *lfs_get(void);
+int lfs_is_ready(void);
 
 int lfs_first_run(void);
 uint32_t lfs_get_boot_count(void);

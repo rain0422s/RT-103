@@ -2,7 +2,10 @@
 #include "w25qxx.h"
 #include "lfs_port.h"
 #include "utils.h"
+#include "FreeRTOS.h"
+#include "semphr.h"
 #define OFFSETBLOCK 		3
+#define LFS_PORT_FILE_MAX      4096U
 /**
  * lfs与底层flash读数据接口
  * @param  c
@@ -64,6 +67,31 @@ static int lfs_deskio_sync(const struct lfs_config *c)
                 return LFS_ERR_IO;
 }
 
+static SemaphoreHandle_t s_lfs_lock;
+
+static int lfs_port_lock(const struct lfs_config *c)
+{
+        (void)c;
+        if (s_lfs_lock == NULL) {
+                s_lfs_lock = xSemaphoreCreateBinary();
+                if (s_lfs_lock == NULL)
+                        return LFS_ERR_NOMEM;
+                (void)xSemaphoreGive(s_lfs_lock);
+        }
+        if (xSemaphoreTake(s_lfs_lock, portMAX_DELAY) != pdTRUE)
+                return LFS_ERR_IO;
+        return LFS_ERR_OK;
+}
+
+static int lfs_port_unlock(const struct lfs_config *c)
+{
+        (void)c;
+        if (s_lfs_lock == NULL)
+                return LFS_ERR_IO;
+        (void)xSemaphoreGive(s_lfs_lock);
+        return LFS_ERR_OK;
+}
+
 
 
 
@@ -83,6 +111,8 @@ const struct lfs_config lfs_w25qxx_cfg =
         .prog  = lfs_deskio_prog,
         .erase = lfs_deskio_erase,
         .sync  = lfs_deskio_sync,
+        .lock  = lfs_port_lock,
+        .unlock = lfs_port_unlock,
 
         // block device configuration
         .read_size = 256,
@@ -94,7 +124,7 @@ const struct lfs_config lfs_w25qxx_cfg =
         .block_cycles = 500,
 
         .name_max=128,
-        .file_max=128, 
+        .file_max=LFS_PORT_FILE_MAX,
         .attr_max=128,
         // .context=512,
 
@@ -127,7 +157,75 @@ int bytes_to_mb(uint32_t bytes) {
 /* 全局挂载：一直挂载，关机时再卸载 */
 static lfs_t s_lfs;
 static int s_mounted = 0;
+static int s_ready = 0;
 static uint32_t s_boot_count = 0;
+
+static int lfs_write_boot_count_value(uint32_t boot_count)
+{
+        lfs_file_t file;
+        int err = lfs_file_open(&s_lfs, &file, "boot_count",
+                                LFS_O_RDWR | LFS_O_CREAT | LFS_O_TRUNC);
+
+        if (err < 0)
+                return err;
+        err = lfs_file_write(&s_lfs, &file, &boot_count, sizeof(boot_count));
+        if (lfs_file_close(&s_lfs, &file) < 0)
+                return LFS_ERR_IO;
+        return (err == (int)sizeof(boot_count)) ? 0 : LFS_ERR_IO;
+}
+
+static int lfs_read_boot_count_value(uint32_t *boot_count)
+{
+        lfs_file_t file;
+        int err;
+        lfs_ssize_t read_len;
+
+        if (boot_count == NULL)
+                return LFS_ERR_INVAL;
+        err = lfs_file_open(&s_lfs, &file, "boot_count", LFS_O_RDONLY);
+        if (err < 0)
+                return err;
+        read_len = lfs_file_read(&s_lfs, &file, boot_count, sizeof(*boot_count));
+        (void)lfs_file_close(&s_lfs, &file);
+        return (read_len == (lfs_ssize_t)sizeof(*boot_count)) ? 0 : LFS_ERR_IO;
+}
+
+static int lfs_ensure_file_limit(void)
+{
+        struct lfs_fsinfo fsinfo;
+        uint32_t saved_boot_count = 0;
+        int has_boot_count;
+        int err;
+
+        if (!s_mounted)
+                return LFS_ERR_IO;
+        err = lfs_fs_stat(&s_lfs, &fsinfo);
+        if (err < 0)
+                return err;
+        DBG_PRINTF("[lfs] limits name=%lu file=%lu attr=%lu\n",
+                   (unsigned long)fsinfo.name_max,
+                   (unsigned long)fsinfo.file_max,
+                   (unsigned long)fsinfo.attr_max);
+        if (fsinfo.file_max >= LFS_PORT_FILE_MAX)
+                return 0;
+
+        has_boot_count = (lfs_read_boot_count_value(&saved_boot_count) == 0);
+        DBG_PRINTF("[lfs] migrate file_max %lu -> %lu\n",
+                   (unsigned long)fsinfo.file_max,
+                   (unsigned long)LFS_PORT_FILE_MAX);
+        err = lfs_unmount_fs();
+        if (err < 0)
+                return err;
+        err = lfs_format(&s_lfs, &lfs_w25qxx_cfg);
+        if (err < 0)
+                return err;
+        err = lfs_mount_fs();
+        if (err < 0)
+                return err;
+        if (has_boot_count)
+                (void)lfs_write_boot_count_value(saved_boot_count);
+        return 0;
+}
 
 int lfs_mount_fs(void)
 {
@@ -135,11 +233,19 @@ int lfs_mount_fs(void)
                 return 0;
         int err = lfs_mount(&s_lfs, &lfs_w25qxx_cfg);
         if (err) {
-                lfs_format(&s_lfs, &lfs_w25qxx_cfg);
-                err = lfs_mount(&s_lfs, &lfs_w25qxx_cfg);
+                DBG_PRINTF("lfs_mount failed: %d\n", err);
+                if (err == LFS_ERR_CORRUPT) {
+                        DBG_PRINTF("lfs_format after corrupt mount\n");
+                        err = lfs_format(&s_lfs, &lfs_w25qxx_cfg);
+                        DBG_PRINTF("lfs_format: %d\n", err);
+                        if (err == 0)
+                                err = lfs_mount(&s_lfs, &lfs_w25qxx_cfg);
+                }
         }
-        if (err == 0)
+        if (err == 0) {
                 s_mounted = 1;
+                s_ready = 0;
+        }
         return err;
 }
 
@@ -148,14 +254,21 @@ int lfs_unmount_fs(void)
         if (!s_mounted)
                 return 0;
         int err = lfs_unmount(&s_lfs);
-        if (err == 0)
+        if (err == 0) {
                 s_mounted = 0;
+                s_ready = 0;
+        }
         return err;
 }
 
 lfs_t *lfs_get(void)
 {
         return s_mounted ? &s_lfs : NULL;
+}
+
+int lfs_is_ready(void)
+{
+        return s_mounted && s_ready;
 }
 
 uint32_t lfs_get_boot_count(void)
@@ -169,6 +282,11 @@ int lfs_first_run(void)
         int err = lfs_mount_fs();
         if (err)
                 return err;
+        err = lfs_ensure_file_limit();
+        if (err)
+                return err;
+        if (s_ready)
+                return 0;
 
         /* 检查剩余空间 */
         int total_blocks = lfs_w25qxx_cfg.block_count;
@@ -201,10 +319,8 @@ int lfs_first_run(void)
                            (unsigned long)info.size);
         }
         lfs_dir_close(&s_lfs, &dir);
+        s_ready = 1;
 
         /* 不卸载，保持挂载 */
         return 0;
 }
-
-
-

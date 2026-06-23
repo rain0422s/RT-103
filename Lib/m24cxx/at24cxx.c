@@ -9,13 +9,12 @@
 
 
 bool at24cxx_read(struct i2c_cli at24cxx ,uint16_t addr, uint8_t* buff, uint16_t len){
-        delay_ms(5);
         return soft_i2c_read_mem(
                 at24cxx.bus, at24cxx.dev,addr,buff, len, at24cxx.ops);    
 }
 
 bool at24cxx_internal_write(struct i2c_cli at24cxx ,uint16_t addr, uint8_t* buff, uint16_t len){
-        delay_ms(5);
+        dly_ms(5);
         return soft_i2c_write_mem(
                 at24cxx.bus, at24cxx.dev,addr,buff, len, at24cxx.ops);
 }

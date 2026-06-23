@@ -52,7 +52,7 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-uint16_t adc_value[100];
+uint16_t adc_value[SENSOR_BATTERY_ADC_SAMPLES];
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -126,13 +126,14 @@ int main(void)
   /* USER CODE BEGIN 2 */
   HAL_TIM_PWM_Start(&htim2,TIM_CHANNEL_1);
   PowerOn;
+  (void)sensor_battery_start(adc_value, SENSOR_BATTERY_ADC_SAMPLES);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
         xTaskCreate((TaskFunction_t)Creator,
                 (const char *)"Creator",
-                (uint16_t)128,
+                (uint16_t)256,
                 (void *)NULL,
                 (UBaseType_t)10,
                 (TaskHandle_t *)&V_handle_task_Creator);
@@ -200,27 +201,40 @@ void SystemClock_Config(void)
  */
 static void Creator(void)
 {
+        enum {
+                TASK_PRIO_POWER_KEY = 11,
+                TASK_PRIO_UI = 7,
+                TASK_PRIO_GESTURE = 5,
+                TASK_PRIO_STORAGE = 4,
+                TASK_PRIO_SENSOR = 3,
+                TASK_PRIO_LED = 2,
+        };
         taskENTER_CRITICAL();
 
         uart_dma_init();
+        DBG_PRINTF("[Creator] creating tasks\n");
 
         BaseType_t ok = pdPASS;
-        if (xTaskCreate((TaskFunction_t)storage_init_task, "storage_init", 512, NULL, 6, NULL) != pdPASS) {
+        if (xTaskCreate((TaskFunction_t)storage_init_task, "storage_init", 768, NULL,
+                        TASK_PRIO_STORAGE, NULL) != pdPASS) {
                 DBG_PRINTF("[Creator] storage_init_task create failed\n");
                 ok = pdFALSE;
         }
 #ifdef U8G2_ENABLED
-        if (xTaskCreate((TaskFunction_t)ui_task, "ui_task", 384, NULL, 5, NULL) != pdPASS) {
+        if (xTaskCreate((TaskFunction_t)ui_task, "ui_task", 1024, NULL, TASK_PRIO_UI,
+                        NULL) != pdPASS) {
                 DBG_PRINTF("[Creator] ui_task create failed\n");
                 ok = pdFALSE;
         }
 #endif
-        if (xTaskCreate((TaskFunction_t)sensor_task, "sensor_task", 256, NULL, 3,
+        if (xTaskCreate((TaskFunction_t)sensor_task, "sensor_task", 1024, NULL,
+                        TASK_PRIO_SENSOR,
                         (TaskHandle_t *)&V_handle_task_DeviceStart) != pdPASS) {
                 DBG_PRINTF("[Creator] sensor_task create failed\n");
                 ok = pdFALSE;
         }
-        if (xTaskCreate((TaskFunction_t)gesture_task, "gesture_task", 384, NULL, 10,
+        if (xTaskCreate((TaskFunction_t)gesture_task, "gesture_task", 512, NULL,
+                        TASK_PRIO_GESTURE,
                         (TaskHandle_t *)&V_handle_task_IdleLED) != pdPASS) {
                 DBG_PRINTF("[Creator] gesture_task create failed\n");
                 ok = pdFALSE;
@@ -232,15 +246,35 @@ static void Creator(void)
         led_ctl_queue = xQueueCreate(LED_CTL_QUEUE_LEN, sizeof(uint8_t));
         if (!led_ctl_queue)
                 ok = pdFALSE;
-        else if (xTaskCreate((TaskFunction_t)led_control_task, "led_ctl", 96, NULL, 2, NULL) != pdPASS)
+        else if (xTaskCreate((TaskFunction_t)led_control_task, "led_ctl", 192, NULL,
+                             TASK_PRIO_LED, NULL) != pdPASS)
                 ok = pdFALSE;
 
         taskEXIT_CRITICAL();
+        DBG_PRINTF("[Creator] tasks ready: %d\n", ok == pdPASS);
         if (ok == pdPASS) {
                 led_control_send(LED_CMD_READY);
         }
 
         vTaskDelete(V_handle_task_Creator);
+}
+
+void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName)
+{
+        (void)xTask;
+        DBG_PRINTF("[fault] stack overflow: %s\n",
+                   (pcTaskName != NULL) ? pcTaskName : "?");
+        taskDISABLE_INTERRUPTS();
+        for (;;) {
+        }
+}
+
+void vApplicationMallocFailedHook(void)
+{
+        DBG_PRINTF("[fault] malloc failed\n");
+        taskDISABLE_INTERRUPTS();
+        for (;;) {
+        }
 }
 /* USER CODE END 4 */
 
@@ -274,6 +308,7 @@ void Error_Handler(void)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
   /* User can add his own implementation to report the HAL error return state */
+  DBG_PRINTF("[fault] Error_Handler\n");
   __disable_irq();
   while (1)
   {

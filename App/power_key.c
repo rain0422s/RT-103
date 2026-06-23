@@ -58,7 +58,6 @@ static void resume_periodic_tasks(void)
 
 static void power_key_task(void *arg)
 {
-	ButtonState buttonState = IDLE_STATE;
 	EventBits_t r_event;
 	(void)arg;
 
@@ -100,21 +99,19 @@ static void power_key_task(void *arg)
 		(void)xTimerStop(xLedTimer, 0);
 
 		if ((xEventGroupGetBits(power_key_evgrp) & POWER_KEY_2S_ELAPSED) != 0) {
-			display_show_shutdown_prompt(true, false, 100);
+			DBG_PRINTF("[power] long press accepted, shutting down\n");
+			display_show_shutdown_prompt(true, true, 100);
 			led_control_send(LED_CMD_ALL_OFF);
-			buttonState = IDLE_STATE;
-			if (button_scan(true, &buttonState) == SHORT_PRESS_STATE) {
-				display_show_shutdown_prompt(true, true, 100);
-				storage_prepare_shutdown();
-				led_control_send(LED_CMD_BLINK_4S);
-				vTaskDelay(pdMS_TO_TICKS(4000));
-				PowerDown;
-			} else {
-				display_show_shutdown_prompt(false, false, 0);
-				led_control_send(LED_CMD_BREATH_ON);
-				resume_periodic_tasks();
-				s_shutdown_active = false;
-			}
+			DBG_PRINTF("[power] stack before storage=%lu\n",
+				   (unsigned long)uxTaskGetStackHighWaterMark(NULL));
+			storage_prepare_shutdown();
+			DBG_PRINTF("[power] stack after storage=%lu\n",
+				   (unsigned long)uxTaskGetStackHighWaterMark(NULL));
+			vTaskDelay(pdMS_TO_TICKS(200));
+			DBG_PRINTF("[power] PowerDown\n");
+			PowerDown;
+			for (;;)
+				vTaskDelay(pdMS_TO_TICKS(1000));
 		} else {
 			/* Released before 2s, cancel shutdown flow and resume tasks. */
 			display_show_shutdown_prompt(false, false, 0);
@@ -143,7 +140,7 @@ int power_key_create(void)
 		return 0;
 	}
 	/* Keep highest priority below configMAX_PRIORITIES-1 after trimming. */
-	if (xTaskCreate(power_key_task, "power_key", 128, NULL, 11, NULL) != pdPASS) {
+	if (xTaskCreate(power_key_task, "power_key", 768, NULL, 11, NULL) != pdPASS) {
 		DBG_PRINTF("[Creator] power_key_task create failed\n");
 		return 0;
 	}
