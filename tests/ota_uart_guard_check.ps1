@@ -39,7 +39,10 @@ Assert-Contains $source "OTA STATUS\?" "OTA STATUS handler missing"
 Assert-Contains $source "OTA_TRANSFER_MAX_DATA_LEN" "OTA data block length must be bounded"
 Assert-Contains $source "if\s*\(hi\s*<\s*0\)\s*return false;" "hex decoder must reject a missing high nibble before reading low nibble"
 Assert-Contains $source "if\s*\(lo\s*<\s*0\)\s*return false;" "hex decoder must reject a missing low nibble before using the byte"
-Assert-Contains $source "HAL_NVIC_SystemReset" "OTA APPLY must reset the MCU"
+Assert-Contains $source "ota_jump_to_bootloader" "OTA APPLY must soft-jump to the bootloader"
+if ($source -match "HAL_NVIC_SystemReset\s*\(") {
+    throw "OTA APPLY must not hard reset the MCU because reset drops PB10/KEY_OUT power hold"
+}
 Assert-Contains $source "ota_store_write_image" "OTA DATA must write to image slot"
 Assert-Contains $source "ota_store_write_manifest" "OTA must write manifest state"
 Assert-Contains $source "ota_crc32_update" "OTA must calculate CRC32"

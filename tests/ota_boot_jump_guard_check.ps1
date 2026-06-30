@@ -34,8 +34,8 @@ Assert-Contains $jumpSource "OTA_FLASH_END" "jump code must validate reset handl
 Assert-Contains $jumpSource "__set_MSP" "jump code must set MSP"
 Assert-Contains $jumpSource "SCB->VTOR" "jump code must set vector table"
 Assert-Contains $main "boot_jump_to_app" "bootloader main must jump to app"
-Assert-Contains $main "MX_GPIO_Init" "bootloader must init GPIO before W25Q CS"
-Assert-Contains $main "MX_SPI1_Init" "bootloader must init SPI1"
+Assert-Contains $main "boot_gpio_init" "bootloader must use local GPIO init before W25Q CS"
+Assert-Contains $main "boot_spi1_init" "bootloader must use local SPI1 init"
 Assert-Contains $pio "-DW25QXX_USE_FREERTOS=0" "bootloader must build W25Q driver without FreeRTOS"
 Assert-Contains $w25q "#if\s+W25QXX_USE_FREERTOS" "W25Q driver must support non-FreeRTOS bootloader builds"
 

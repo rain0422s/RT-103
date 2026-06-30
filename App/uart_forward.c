@@ -16,8 +16,8 @@
 #include <stdio.h>
 #include <string.h>
 
-#define USART_LEN 96
-#define UART_LINE_LEN 96
+#define USART_LEN 192
+#define UART_LINE_LEN 192
 
 extern DMA_HandleTypeDef hdma_usart2_rx;
 extern DMA_HandleTypeDef hdma_usart2_tx;

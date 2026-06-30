@@ -33,6 +33,7 @@ static void power_key_task(void *arg);
 static void vTimerCallback(TimerHandle_t xTimer);
 static void suspend_periodic_tasks(void);
 static void resume_periodic_tasks(void);
+static bool power_key_confirm_shutdown(void);
 
 static void suspend_periodic_tasks(void)
 {
@@ -54,6 +55,14 @@ static void resume_periodic_tasks(void)
 	if (V_handle_task_IdleLED)
 		vTaskResume(V_handle_task_IdleLED);
 	s_periodic_tasks_suspended = false;
+}
+
+static bool power_key_confirm_shutdown(void)
+{
+	ButtonState confirm_state = IDLE_STATE;
+	const ButtonState confirm = button_scan(true, &confirm_state);
+
+	return confirm == SHORT_PRESS_STATE;
 }
 
 static void power_key_task(void *arg)
@@ -99,19 +108,28 @@ static void power_key_task(void *arg)
 		(void)xTimerStop(xLedTimer, 0);
 
 		if ((xEventGroupGetBits(power_key_evgrp) & POWER_KEY_2S_ELAPSED) != 0) {
-			DBG_PRINTF("[power] long press accepted, shutting down\n");
-			display_show_shutdown_prompt(true, true, 100);
-			led_control_send(LED_CMD_ALL_OFF);
-			DBG_PRINTF("[power] stack before storage=%lu\n",
-				   (unsigned long)uxTaskGetStackHighWaterMark(NULL));
-			storage_prepare_shutdown();
-			DBG_PRINTF("[power] stack after storage=%lu\n",
-				   (unsigned long)uxTaskGetStackHighWaterMark(NULL));
-			vTaskDelay(pdMS_TO_TICKS(200));
-			DBG_PRINTF("[power] PowerDown\n");
-			PowerDown;
-			for (;;)
-				vTaskDelay(pdMS_TO_TICKS(1000));
+			DBG_PRINTF("[power] long press accepted, waiting confirm\n");
+			display_show_shutdown_prompt(true, false, 100);
+			if (power_key_confirm_shutdown()) {
+				DBG_PRINTF("[power] shutdown confirmed\n");
+				display_show_shutdown_prompt(true, true, 100);
+				led_control_send(LED_CMD_ALL_OFF);
+				DBG_PRINTF("[power] stack before storage=%lu\n",
+					   (unsigned long)uxTaskGetStackHighWaterMark(NULL));
+				storage_prepare_shutdown();
+				DBG_PRINTF("[power] stack after storage=%lu\n",
+					   (unsigned long)uxTaskGetStackHighWaterMark(NULL));
+				vTaskDelay(pdMS_TO_TICKS(200));
+				DBG_PRINTF("[power] PowerDown\n");
+				PowerDown;
+				for (;;)
+					vTaskDelay(pdMS_TO_TICKS(1000));
+			} else {
+				DBG_PRINTF("[power] shutdown confirm canceled\n");
+				display_show_shutdown_prompt(false, false, 0);
+				resume_periodic_tasks();
+				s_shutdown_active = false;
+			}
 		} else {
 			/* Released before 2s, cancel shutdown flow and resume tasks. */
 			display_show_shutdown_prompt(false, false, 0);

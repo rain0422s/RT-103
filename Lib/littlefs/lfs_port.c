@@ -86,6 +86,10 @@ static int lfs_port_lock(const struct lfs_config *c)
         }
         if (xSemaphoreTake(s_lfs_lock, portMAX_DELAY) != pdTRUE)
                 return LFS_ERR_IO;
+        if (!w25qxx_lock()) {
+                (void)xSemaphoreGive(s_lfs_lock);
+                return LFS_ERR_IO;
+        }
         return LFS_ERR_OK;
 }
 
@@ -94,6 +98,7 @@ static int lfs_port_unlock(const struct lfs_config *c)
         (void)c;
         if (s_lfs_lock == NULL)
                 return LFS_ERR_IO;
+        w25qxx_unlock();
         (void)xSemaphoreGive(s_lfs_lock);
         return LFS_ERR_OK;
 }

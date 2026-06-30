@@ -11,6 +11,11 @@
 #include <stdio.h>
 #include <string.h>
 
+#define OTA_APPLY_REPLY_DRAIN_MS 20U
+#define OTA_NVIC_IRQ_WORDS       8U
+
+typedef void (*ota_boot_entry_t)(void);
+
 typedef struct {
 	bool active;
 	bool staged;
@@ -121,6 +126,76 @@ static bool ota_flash_ready(void)
 	return storage_flash_is_present();
 }
 
+static bool ota_bootloader_is_valid(void)
+{
+	const uint32_t msp = *(volatile uint32_t *)OTA_BOOTLOADER_BASE;
+	const uint32_t reset = *(volatile uint32_t *)(OTA_BOOTLOADER_BASE + 4UL);
+
+	if (msp < OTA_SRAM_BASE || msp > OTA_SRAM_END)
+		return false;
+	if (reset < OTA_BOOTLOADER_BASE || reset >= OTA_APP_BASE)
+		return false;
+	if ((reset & 1UL) == 0UL)
+		return false;
+	return true;
+}
+
+static void ota_switch_to_hsi(void)
+{
+	uint32_t timeout;
+
+	RCC->CR |= RCC_CR_HSION;
+	timeout = 0xFFFFUL;
+	while ((RCC->CR & RCC_CR_HSIRDY) == 0UL && timeout-- > 0UL) {
+	}
+
+	RCC->CFGR &= ~RCC_CFGR_SW;
+	timeout = 0xFFFFUL;
+	while ((RCC->CFGR & RCC_CFGR_SWS) != 0UL && timeout-- > 0UL) {
+	}
+
+	RCC->CR &= ~RCC_CR_PLLON;
+	timeout = 0xFFFFUL;
+	while ((RCC->CR & RCC_CR_PLLRDY) != 0UL && timeout-- > 0UL) {
+	}
+	RCC->CR &= ~(RCC_CR_HSEON | RCC_CR_CSSON);
+}
+
+static void ota_jump_to_bootloader(void)
+{
+	const uint32_t boot_msp = *(volatile uint32_t *)OTA_BOOTLOADER_BASE;
+	const uint32_t boot_reset =
+		*(volatile uint32_t *)(OTA_BOOTLOADER_BASE + 4UL);
+	const ota_boot_entry_t boot_entry = (ota_boot_entry_t)boot_reset;
+
+	__HAL_RCC_GPIOB_CLK_ENABLE();
+	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_10, GPIO_PIN_SET);
+
+	__disable_irq();
+	SysTick->CTRL = 0;
+	SysTick->LOAD = 0;
+	SysTick->VAL = 0;
+	SCB->ICSR = SCB_ICSR_PENDSVCLR_Msk | SCB_ICSR_PENDSTCLR_Msk;
+	for (uint32_t i = 0; i < OTA_NVIC_IRQ_WORDS; i++) {
+		NVIC->ICER[i] = 0xFFFFFFFFUL;
+		NVIC->ICPR[i] = 0xFFFFFFFFUL;
+	}
+	ota_switch_to_hsi();
+	SCB->VTOR = OTA_BOOTLOADER_BASE;
+	__set_BASEPRI(0U);
+	__set_FAULTMASK(0U);
+	__set_MSP(boot_msp);
+	__set_PSP(0U);
+	__set_CONTROL(0U);
+	__DSB();
+	__ISB();
+	__enable_irq();
+	boot_entry();
+
+	while (1) {
+	}
+}
+
 static bool ota_begin(char *line, ota_reply_fn reply, void *ctx)
 {
 	uint32_t size;
@@ -196,10 +271,6 @@ static bool ota_data(char *line, ota_reply_fn reply, void *ctx)
 	s_ota.running_crc = ota_crc32_update(s_ota.running_crc, s_ota_chunk, len);
 	s_ota.manifest.received_size += len;
 	ota_manifest_finalize(&s_ota.manifest);
-	if (!ota_store_write_manifest(&s_ota.manifest)) {
-		ota_reply(reply, ctx, "ERR OTA MANIFEST");
-		return true;
-	}
 
 	ota_reply(reply, ctx, "OK OTA DATA");
 	return true;
@@ -235,6 +306,10 @@ static bool ota_end(ota_reply_fn reply, void *ctx)
 
 static bool ota_apply(ota_reply_fn reply, void *ctx)
 {
+	if (!ota_bootloader_is_valid()) {
+		ota_reply(reply, ctx, "ERR OTA BOOT");
+		return true;
+	}
 	if (!s_ota.staged || !ota_manifest_is_valid(&s_ota.manifest)) {
 		ota_reply(reply, ctx, "ERR OTA APPLY");
 		return true;
@@ -247,7 +322,8 @@ static bool ota_apply(ota_reply_fn reply, void *ctx)
 	}
 
 	ota_reply(reply, ctx, "OK OTA APPLY");
-	HAL_NVIC_SystemReset();
+	HAL_Delay(OTA_APPLY_REPLY_DRAIN_MS);
+	ota_jump_to_bootloader();
 	return true;
 }
 

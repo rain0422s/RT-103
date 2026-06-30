@@ -3,8 +3,8 @@ $ErrorActionPreference = "Stop"
 $powerPath = Join-Path $PSScriptRoot "..\App\power_key.c"
 $power = Get-Content -Raw -Path $powerPath
 
-if ($power -match "button_scan\s*\(\s*true") {
-    throw "power shutdown must not wait for PA1 button_scan confirmation after PB11 long press"
+if ($power -notmatch "button_scan\s*\(\s*true") {
+    throw "power shutdown must require PA1 button_scan confirmation after PB11 long press"
 }
 
 if ($power -notmatch "PowerDown") {

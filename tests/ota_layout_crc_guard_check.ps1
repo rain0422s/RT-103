@@ -108,7 +108,7 @@ Assert-Contains $layout "#define\s+OTA_LFS_OFFSET_BLOCKS\s+65UL" "LittleFS block
 Assert-Contains $layout "#define\s+OTA_LFS_BLOCK_COUNT\s+447UL" "LittleFS block count must fit W25Q16"
 Assert-Contains $layout "#define\s+OTA_OLD_LFS_OFFSET_BLOCKS\s+3UL" "old LittleFS offset must remain available for migration"
 Assert-Contains $layout "#define\s+OTA_OLD_LFS_BLOCK_COUNT\s+512UL" "old LittleFS block count must match existing formatted filesystems"
-Assert-Contains $layout "#define\s+OTA_TRANSFER_MAX_DATA_LEN\s+16UL" "OTA transfer data length must match 16-byte protocol chunks"
+Assert-Contains $layout "#define\s+OTA_TRANSFER_MAX_DATA_LEN\s+64UL" "OTA transfer data length must match 64-byte protocol chunks"
 
 Assert-Contains $crcHeader "uint32_t\s+ota_crc32_begin\s*\(void\)" "crc begin prototype missing"
 Assert-Contains $crcHeader "uint32_t\s+ota_crc32_update\s*\(uint32_t crc,\s*const void \*data,\s*uint32_t len\)" "crc update prototype missing"

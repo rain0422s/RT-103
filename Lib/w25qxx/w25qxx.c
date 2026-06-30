@@ -6,8 +6,40 @@
 
 #if W25QXX_USE_FREERTOS
 #include "FreeRTOS.h"
+#include "semphr.h"
 #include "task.h"
 #endif
+
+#if W25QXX_USE_FREERTOS
+static SemaphoreHandle_t s_w25qxx_mutex;
+#endif
+
+bool w25qxx_lock()
+{
+#if W25QXX_USE_FREERTOS
+        if (xTaskGetSchedulerState() != taskSCHEDULER_RUNNING)
+                return true;
+        if (s_w25qxx_mutex == NULL) {
+                s_w25qxx_mutex = xSemaphoreCreateBinary();
+                if (s_w25qxx_mutex == NULL)
+                        return false;
+                (void)xSemaphoreGive(s_w25qxx_mutex);
+        }
+        return xSemaphoreTake(s_w25qxx_mutex, portMAX_DELAY) == pdTRUE;
+#else
+        return true;
+#endif
+}
+
+void w25qxx_unlock()
+{
+#if W25QXX_USE_FREERTOS
+        if (xTaskGetSchedulerState() != taskSCHEDULER_RUNNING)
+                return;
+        if (s_w25qxx_mutex != NULL)
+                (void)xSemaphoreGive(s_w25qxx_mutex);
+#endif
+}
 
 static void w25qxx_poll_delay(void)
 {

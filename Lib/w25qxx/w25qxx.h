@@ -2,6 +2,7 @@
 #define __W25QXX_H
 
 #include "spi.h"
+#include "stdbool.h"
 #include "stdint.h"
 #define W25QXX_SPI hspi1
 #define CS_GPIO_Port  GPIOA
@@ -89,6 +90,8 @@
 
 
 void     w25qxx_reset();
+bool            w25qxx_lock();
+void            w25qxx_unlock();
 uint8_t  w25qxx_getstatus();
 uint8_t         w25qxx_write_enable();
 void            w25qxx_read_id(uint8_t* ID);
