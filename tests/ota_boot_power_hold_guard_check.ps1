@@ -31,10 +31,13 @@ if ($boot -notmatch "\bboot_spi1_init\s*\(") {
 }
 if ($boot -notmatch "\bboot_power_key_pressed\s*\(" -or
     $boot -notmatch "\bs_boot_power_key_latched\b" -or
-    $boot -notmatch "\bboot_power_key_bypass_requested\s*\(" -or
     $boot -notmatch "(?s)s_boot_power_key_latched\s*=\s*boot_power_key_pressed\s*\(\s*\).*?w25qxx_reset\s*\(" -or
-    $boot -notmatch "(?s)if\s*\(\s*!\s*boot_power_key_bypass_requested\s*\(\s*\)\s*\)\s*\{.*?boot_ota_apply_if_pending\s*\(") {
-    throw "bootloader must bypass pending OTA while the manual power key is held"
+    $boot -notmatch "(?s)w25qxx_reset\s*\(\s*\)\s*;.*?boot_ota_apply_if_pending\s*\(") {
+    throw "bootloader must keep power-key diagnostics but still apply pending OTA"
+}
+if ($boot -match "\bboot_power_key_bypass_requested\s*\(" -or
+    $boot -match "(?s)if\s*\([^)]*boot_power_key[^)]*\)\s*\{[^}]*boot_ota_apply_if_pending") {
+    throw "manual power key must not gate pending OTA apply"
 }
 if ($clockCall -lt 0 -or $flashReset -lt 0 -or
     $gpioCall -gt $clockCall -or $gpioCall -gt $flashReset) {

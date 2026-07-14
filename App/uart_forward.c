@@ -7,6 +7,7 @@
 #include "storage.h"
 #include "sensor.h"
 #include "display.h"
+#include "ota_layout.h"
 #include "ota_update.h"
 #include "FreeRTOS.h"
 #include "task.h"
@@ -16,8 +17,9 @@
 #include <stdio.h>
 #include <string.h>
 
-#define USART_LEN 192
+#define USART_LEN 320
 #define UART_LINE_LEN 192
+#define UART_FORWARD_TASK_STACK_WORDS 512
 
 extern DMA_HandleTypeDef hdma_usart2_rx;
 extern DMA_HandleTypeDef hdma_usart2_tx;
@@ -85,6 +87,14 @@ static void uart_ota_reply(const char *text, void *ctx)
 {
 	(void)ctx;
 	uart_reply("%s\r\n", text);
+}
+
+static uint32_t uart_load_le32(const uint8_t *data)
+{
+	return (uint32_t)data[0] |
+	       ((uint32_t)data[1] << 8U) |
+	       ((uint32_t)data[2] << 16U) |
+	       ((uint32_t)data[3] << 24U);
 }
 
 static const char *uart_skip_spaces(const char *s)
@@ -459,6 +469,13 @@ static void uart_forward_task(void *argument)
 			continue;
 		if (event.size == 0 || event.size > USART_LEN)
 			continue;
+		if (event.dev == SLAVE_UART &&
+		    event.size >= sizeof(uint32_t) &&
+		    uart_load_le32(event.data) == OTA_BINARY_MAGIC) {
+			(void)ota_binary_process(event.data, event.size,
+						 uart_ota_reply, NULL);
+			continue;
+		}
 		if (event.dev == SLAVE_UART)
 			uart_process_pc_bytes(event.data, event.size);
 		else
@@ -494,7 +511,8 @@ void uart_dma_init(void)
 	uart_start_idle_dma(SLAVE_UART);
 	uart_start_idle_dma(MASTER_UART);
 
-	xTaskCreate(uart_forward_task, "uart_fwd", 256, NULL, 5, NULL);
+	xTaskCreate(uart_forward_task, "uart_fwd", UART_FORWARD_TASK_STACK_WORDS,
+		    NULL, 5, NULL);
 }
 
 void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)

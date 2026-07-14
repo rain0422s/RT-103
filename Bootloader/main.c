@@ -1,5 +1,6 @@
 #include "boot_jump.h"
 #include "boot_ota.h"
+#include "ota_boot_state.h"
 #include "spi.h"
 #include "stm32f1xx_hal.h"
 #include "w25qxx.h"
@@ -142,11 +143,6 @@ static void boot_power_key_latch_sample(void)
 	}
 }
 
-static bool boot_power_key_bypass_requested(void)
-{
-	return s_boot_power_key_latched || boot_power_key_pressed();
-}
-
 static void boot_gpio_init(void)
 {
 	GPIO_InitTypeDef gpio = {0};
@@ -211,6 +207,11 @@ static bool boot_spi1_init(void)
 
 int main(void)
 {
+	uint32_t boot_slot = OTA_SLOT_A;
+	uint32_t boot_base;
+	ota_boot_state_t boot_state;
+	bool rolled_back = false;
+
 #if BOOT_DIAG_UART
 	boot_diag_early_probe();
 #endif
@@ -240,19 +241,26 @@ int main(void)
 		boot_diag_puts("B\r\n");
 		w25qxx_reset();
 		boot_diag_puts("C\r\n");
-		if (!boot_power_key_bypass_requested()) {
-			(void)boot_ota_apply_if_pending();
-			boot_diag_puts("D\r\n");
-		} else {
+		if (boot_power_key_pressed())
 			boot_diag_puts("K\r\n");
-		}
+		(void)boot_ota_apply_if_pending();
+		boot_diag_puts("D\r\n");
 	} else {
 		boot_diag_puts("S\r\n");
 	}
 
-	if (boot_app_is_valid()) {
+	if (!ota_boot_state_select_boot_slot(&boot_state, &boot_slot,
+					     &rolled_back)) {
+		ota_boot_state_defaults(&boot_state);
+		boot_slot = boot_state.active_slot;
+	}
+	if (rolled_back)
+		boot_ota_mark_confirm_timeout(boot_state.pending_version);
+	boot_base = ota_boot_state_slot_base(boot_slot);
+
+	if (boot_app_is_valid_at(boot_base)) {
 		boot_diag_puts("J\r\n");
-		boot_jump_to_app();
+		boot_jump_to_slot(boot_base);
 	}
 
 	boot_diag_puts("N\r\n");

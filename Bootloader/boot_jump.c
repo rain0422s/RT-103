@@ -84,24 +84,31 @@ static void boot_reset_app_peripherals(void)
 	__ISB();
 }
 
-bool boot_app_is_valid(void)
+bool boot_app_is_valid_at(uint32_t app_base)
 {
-	const uint32_t msp = *(volatile uint32_t *)OTA_APP_BASE;
-	const uint32_t reset = *(volatile uint32_t *)(OTA_APP_BASE + 4UL);
+	const uint32_t msp = *(volatile uint32_t *)app_base;
+	const uint32_t reset = *(volatile uint32_t *)(app_base + 4UL);
 
+	if (app_base != OTA_APP_SLOT_A_BASE && app_base != OTA_APP_SLOT_B_BASE)
+		return false;
 	if (msp < OTA_SRAM_BASE || msp > OTA_SRAM_END)
 		return false;
-	if (reset < OTA_APP_BASE || reset >= OTA_FLASH_END)
+	if (reset < app_base || reset >= app_base + OTA_APP_SLOT_SIZE)
 		return false;
 	if ((reset & 1UL) == 0UL)
 		return false;
 	return true;
 }
 
-void boot_jump_to_app(void)
+bool boot_app_is_valid(void)
 {
-	const uint32_t app_msp = *(volatile uint32_t *)OTA_APP_BASE;
-	const uint32_t app_reset = *(volatile uint32_t *)(OTA_APP_BASE + 4UL);
+	return boot_app_is_valid_at(OTA_APP_BASE);
+}
+
+void boot_jump_to_slot(uint32_t app_base)
+{
+	const uint32_t app_msp = *(volatile uint32_t *)app_base;
+	const uint32_t app_reset = *(volatile uint32_t *)(app_base + 4UL);
 	const boot_app_entry_t app_entry = (boot_app_entry_t)app_reset;
 
 	__disable_irq();
@@ -116,7 +123,7 @@ void boot_jump_to_app(void)
 		NVIC->ICER[i] = 0xFFFFFFFFUL;
 		NVIC->ICPR[i] = 0xFFFFFFFFUL;
 	}
-	SCB->VTOR = OTA_APP_BASE;
+	SCB->VTOR = app_base;
 	__set_BASEPRI(0U);
 	__set_FAULTMASK(0U);
 	__set_PSP(0U);
@@ -126,4 +133,9 @@ void boot_jump_to_app(void)
 	__ISB();
 	__enable_irq();
 	app_entry();
+}
+
+void boot_jump_to_app(void)
+{
+	boot_jump_to_slot(OTA_APP_BASE);
 }

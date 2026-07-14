@@ -9,7 +9,7 @@ if ($ota -notmatch "ota_jump_to_bootloader\s*\(") {
 }
 
 if ($ota -notmatch "OTA_BOOTLOADER_BASE" -or
-    $ota -notmatch "OTA_APP_BASE" -or
+    $ota -notmatch "OTA_BOOTLOADER_SIZE" -or
     $ota -notmatch "OTA_SRAM_BASE" -or
     $ota -notmatch "OTA_SRAM_END") {
     throw "soft jump must validate bootloader vector ranges"

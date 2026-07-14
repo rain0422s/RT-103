@@ -89,9 +89,13 @@ $crcHeader = Read-Text $crcHeaderPath
 $crcSource = Read-Text $crcSourcePath
 
 Assert-Contains $layout "#define\s+OTA_BOOTLOADER_BASE\s+0x08000000UL" "bootloader base must stay at 0x08000000"
-Assert-Contains $layout "#define\s+OTA_BOOTLOADER_SIZE\s+0x00008000UL" "bootloader size must stay 32KB"
-Assert-Contains $layout "#define\s+OTA_APP_BASE\s+0x08008000UL" "app base must stay at 0x08008000"
-Assert-Contains $layout "#define\s+OTA_APP_SIZE\s+0x00038000UL" "app size must stay 224KB"
+Assert-Contains $layout "#define\s+OTA_BOOTLOADER_SIZE\s+0x00007000UL" "bootloader code size must stay 28KB"
+Assert-Contains $layout "#define\s+OTA_BOOT_STATE_PRIMARY_ADDR\s+0x08007000UL" "boot state primary page must start at 0x08007000"
+Assert-Contains $layout "#define\s+OTA_BOOT_STATE_BACKUP_ADDR\s+0x08007800UL" "boot state backup page must start at 0x08007800"
+Assert-Contains $layout "#define\s+OTA_APP_SLOT_A_BASE\s+0x08008000UL" "slot A base must stay at 0x08008000"
+Assert-Contains $layout "#define\s+OTA_APP_SLOT_B_BASE\s+0x08024000UL" "slot B base must stay at 0x08024000"
+Assert-Contains $layout "#define\s+OTA_APP_SLOT_SIZE\s+0x0001C000UL" "app slot size must stay 112KB"
+Assert-Contains $layout "#define\s+OTA_APP_SIZE\s+OTA_APP_SLOT_SIZE" "app size must map to the current slot size"
 Assert-Contains $layout "#define\s+OTA_FLASH_END\s+0x08040000UL" "flash end must match STM32F103RCT6 256KB boundary"
 Assert-Contains $layout "#define\s+OTA_SRAM_BASE\s+0x20000000UL" "SRAM base must stay at 0x20000000"
 Assert-Contains $layout "#define\s+OTA_SRAM_SIZE\s+0x0000C000UL" "SRAM size must stay 48KB"
@@ -108,7 +112,8 @@ Assert-Contains $layout "#define\s+OTA_LFS_OFFSET_BLOCKS\s+65UL" "LittleFS block
 Assert-Contains $layout "#define\s+OTA_LFS_BLOCK_COUNT\s+447UL" "LittleFS block count must fit W25Q16"
 Assert-Contains $layout "#define\s+OTA_OLD_LFS_OFFSET_BLOCKS\s+3UL" "old LittleFS offset must remain available for migration"
 Assert-Contains $layout "#define\s+OTA_OLD_LFS_BLOCK_COUNT\s+512UL" "old LittleFS block count must match existing formatted filesystems"
-Assert-Contains $layout "#define\s+OTA_TRANSFER_MAX_DATA_LEN\s+64UL" "OTA transfer data length must match 64-byte protocol chunks"
+Assert-Contains $layout "#define\s+OTA_TRANSFER_MAX_DATA_LEN\s+256UL" "OTA transfer data length must match binary 256-byte protocol chunks"
+Assert-Contains $layout "#define\s+OTA_RESUME_CHECKPOINT_SIZE\s+0x00001000UL" "OTA resume checkpoint must be one W25Q sector"
 
 Assert-Contains $crcHeader "uint32_t\s+ota_crc32_begin\s*\(void\)" "crc begin prototype missing"
 Assert-Contains $crcHeader "uint32_t\s+ota_crc32_update\s*\(uint32_t crc,\s*const void \*data,\s*uint32_t len\)" "crc update prototype missing"

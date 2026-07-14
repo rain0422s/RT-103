@@ -13,8 +13,8 @@ Assert-Contains $bootOta "\bboot_ota_image_header_ok\s*\(" "bootloader must pref
 Assert-Contains $bootOta "ota_store_read_image\s*\(\s*0UL\s*," "staged app preflight must read the image vector table first"
 Assert-Contains $bootOta "OTA_SRAM_BASE" "staged app preflight must validate MSP is in SRAM"
 Assert-Contains $bootOta "OTA_SRAM_END" "staged app preflight must validate MSP is in SRAM"
-Assert-Contains $bootOta "OTA_APP_BASE" "staged app preflight must validate reset vector target"
-Assert-Contains $bootOta "OTA_FLASH_END" "staged app preflight must validate reset vector target"
+Assert-Contains $bootOta "app_base" "staged app preflight must validate reset vector against target slot base"
+Assert-Contains $bootOta "OTA_APP_SLOT_SIZE" "staged app preflight must validate reset vector inside target slot"
 
 $pendingCheck = $bootOta.IndexOf("if (!ota_manifest_is_pending")
 $headerCheck = $bootOta.IndexOf("if (!boot_ota_image_header_ok")

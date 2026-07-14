@@ -27,6 +27,7 @@ $otaSource = Read-Text $otaSourcePath
 $main = Read-Text $mainPath
 
 Assert-Contains $flashHeader "boot_flash_erase_app" "erase app prototype missing"
+Assert-Contains $flashHeader "boot_flash_erase_slot" "erase slot prototype missing"
 Assert-Contains $flashHeader "boot_flash_program" "program prototype missing"
 Assert-Contains $flashSource "HAL_FLASHEx_Erase" "bootloader must erase app pages"
 Assert-Contains $flashSource "HAL_FLASH_Program" "bootloader must program internal flash"
@@ -35,12 +36,12 @@ Assert-Contains $otaHeader "boot_ota_apply_if_pending" "OTA apply prototype miss
 Assert-Contains $otaSource "ota_manifest_is_pending" "bootloader must only apply pending manifest"
 Assert-Contains $otaSource "ota_store_read_image" "bootloader must read image slot"
 Assert-Contains $otaSource "ota_crc32_update" "bootloader must verify image CRC"
-Assert-Contains $otaSource "boot_flash_erase_app" "bootloader must erase app before programming"
+Assert-Contains $otaSource "boot_flash_erase_slot" "bootloader must erase target slot before programming"
 Assert-Contains $otaSource "boot_flash_program" "bootloader must program app flash"
 Assert-Contains $otaSource "boot_ota_app_crc_ok" "bootloader must verify programmed internal flash"
-Assert-Contains $otaSource "\(const uint8_t \*\)OTA_APP_BASE" "internal flash CRC must read from OTA app base"
+Assert-Contains $otaSource "\(const uint8_t \*\)app_base" "internal flash CRC must read from selected app slot base"
 Assert-Contains $otaSource "OTA_MANIFEST_STATE_APPLIED" "bootloader must mark successful apply"
-Assert-Contains $otaSource "OTA_MANIFEST_STATE_ERROR" "bootloader must mark failed apply"
+Assert-Contains $otaSource "ota_manifest_set_failure" "bootloader must mark failed apply with a reason code"
 Assert-Contains $main "boot_ota_apply_if_pending" "bootloader main must invoke OTA apply before app jump"
 
 Write-Output "OTA boot install guard OK"

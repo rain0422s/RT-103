@@ -21,7 +21,7 @@
 // 任务最小栈大小
 #define configMINIMAL_STACK_SIZE                128
 // FreeRTOS 堆空间（48KB RAM 约用 30% 时可适当增大；16KB 仍留足余量）
-#define configTOTAL_HEAP_SIZE                   24576
+#define configTOTAL_HEAP_SIZE                   28672
 // 任务名称最大长度
 #define configMAX_TASK_NAME_LEN                 16
 // 系统节拍计数器的变量类型，即定义portTickType是表示16位变量还是32位变量。

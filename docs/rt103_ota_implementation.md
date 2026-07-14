@@ -2,224 +2,235 @@
 
 更新时间：2026-06-30
 
-适用项目：RT-103，STM32F103RCT6，PlatformIO，FreeRTOS，外部 W25Q16 Flash，串口 COM5。
+适用项目：RT-103，STM32F103RCT6，PlatformIO，FreeRTOS，W25Q16 外部 Flash，串口 COM5。
 
 ## 这篇文章解决什么问题
 
-RT-103 只有串口可用，没有 ST-Link 作为量产升级通道。目标是在设备已经运行 app 的情况下，通过串口下发新的 app bin，让设备自己完成升级，并且不破坏用户数据。
+RT-103 量产后主要可用通道是串口，没有默认依赖 ST-Link 的现场升级条件。目标是在设备已经运行 app 的情况下，通过串口下发新的 app bin，让设备自己完成升级，同时保护 W25Q 中的用户数据，并尽量提升断电恢复能力。
 
-这个项目最终采用“双阶段 OTA”：
+当前 OTA 采用双阶段方案：
 
-- app 负责接收 bin，并暂存到 W25Q 外部 Flash
-- bootloader 负责校验暂存镜像，并写入 STM32 内部 Flash 的 app 区
-- app 和 bootloader 之间通过 manifest 状态机交接
-- `OTA APPLY` 使用软跳 bootloader，而不是硬复位
+- app 负责通过 USART1 接收固件，写入 W25Q16 的 OTA 暂存区。
+- bootloader 负责校验暂存镜像，并写入 STM32 内部 Flash 的目标 app slot。
+- app 和 bootloader 通过 W25Q manifest 交接 OTA 状态。
+- bootloader 通过内部 Flash boot state 记录 A/B slot、确认状态、防回滚版本和启动尝试次数。
+- `OTA APPLY` 使用软跳 bootloader，不使用硬复位，避免 PB10/KEY_OUT 掉电。
 
-## 常见误区
+## 关键结论
 
-不要把 OTA 做成“app 直接写自己所在的内部 Flash”。这样风险很高：
+这一版已经从“单 app 区升级”增强为“内部 Flash A/B app 分区升级”：
 
-- app 正在从内部 Flash 执行，直接擦写 app 区容易把自己擦掉
-- 写入中断电后容易留下不可启动镜像
-- app 侧有 FreeRTOS、DMA、串口、LittleFS 等运行时状态，直接切换风险更大
+| 能力 | 当前实现 |
+|---|---|
+| 版本号 | manifest v2 增加 `firmware_version` 和 `min_allowed_version` |
+| 防回滚 | boot state 保存 `accepted_version`，低版本镜像会被拒绝 |
+| 断点续传 | manifest 保存 `received_size`，每 4KB checkpoint 持久化一次 |
+| 提速 | 保留 ASCII 文本协议，同时新增 `OTAB` 直接二进制包 |
+| A/B 分区 | app A 和 app B 分别链接到不同内部 Flash slot |
+| 断电恢复 | 新固件先写 inactive slot，启动成功后 app confirm，否则 bootloader 回滚 |
+| 售后定位 | manifest 增加 `failure_reason` 和 `failure_detail` |
 
-也不要把用户数据和 OTA 暂存区混在一起。RT-103 的用户数据主要在 W25Q 的 LittleFS 区，OTA image slot 必须单独规划，避免升级时擦掉用户数据。
+## 内部 Flash 布局
 
-## 总体架构
+STM32F103RCT6 内部 Flash 共 256KB。A/B 方案下布局如下：
 
-整体链路是：
+| 区域 | 地址 | 大小 | 用途 |
+|---|---:|---:|---|
+| bootloader | `0x08000000` | 28KB | 引导、OTA 应用、slot 选择 |
+| boot state primary | `0x08007000` | 2KB | A/B 状态主记录 |
+| boot state backup | `0x08007800` | 2KB | A/B 状态备份记录 |
+| app slot A | `0x08008000` | 112KB | A 槽 app |
+| app slot B | `0x08024000` | 112KB | B 槽 app |
 
-1. PC 读取 app bin
-2. PC 通过串口发 ASCII OTA 命令
-3. app 接收命令，把 bin 分包写入 W25Q OTA image slot
-4. app 写 manifest，记录镜像大小、CRC、接收进度和状态
-5. `OTA END` 校验整包 CRC，通过后标记为 `STAGED`
-6. `OTA APPLY` 把 manifest 标记为 `PENDING`
-7. app 保持 PB10/KEY_OUT 高电平，软跳到 bootloader
-8. bootloader 读取 manifest，发现 `PENDING`
-9. bootloader 校验 W25Q 镜像头和整包 CRC
-10. bootloader 擦写内部 Flash app 区
-11. bootloader 校验写入后的内部 Flash app CRC
-12. bootloader 标记 `APPLIED`
-13. bootloader 清理运行状态，跳转到新 app
+注意：真 A/B 不能把同一个 app bin 同时放到两个地址运行。app A 和 app B 的 VTOR、ResetHandler、常量地址都与链接地址相关，所以必须分别构建：
 
-## Flash 布局
+```text
+pio run -e app_a
+pio run -e app_b
+```
 
-内部 Flash：
+`app_a` 使用 `STM32F103XX_APP_A.ld`，向量表偏移 `0x00008000`。`app_b` 使用 `STM32F103XX_APP_B.ld`，向量表偏移 `0x00024000`。
+
+## W25Q16 布局
+
+外部 Flash 仍然只作为 OTA 暂存和用户数据存储，不直接作为执行区：
 
 | 区域 | 地址 | 用途 |
 |---|---:|---|
-| bootloader | `0x08000000` | 固定 32KB，引导和 OTA 应用逻辑 |
-| app | `0x08008000` | 主应用固件 |
-
-W25Q 外部 Flash：
-
-| 区域 | 地址 | 用途 |
-|---|---:|---|
-| manifest | `0x00000000` | OTA 状态、大小、CRC、校验 |
+| manifest | `0x00000000` | OTA 状态、版本、CRC、失败原因 |
 | image slot | `0x00001000` | 暂存 app bin |
 | LittleFS | `0x00041000` | 用户数据文件系统 |
 
-这个布局保证了 OTA 暂存镜像不会覆盖 LittleFS 用户数据。
+OTA 只擦写 manifest 和 image slot，不擦写 LittleFS。W25Q 驱动有共享锁，避免 LittleFS 和 OTA 同时抢 SPI 总线。
+
+## manifest v2
+
+manifest 是 app 和 bootloader 之间的交接契约。v2 主要字段如下：
+
+| 字段 | 含义 |
+|---|---|
+| `state` | `RECEIVING`、`STAGED`、`PENDING`、`APPLIED`、`ERROR` |
+| `image_size` | 待升级 app bin 大小 |
+| `image_crc32` | 整包 CRC32 |
+| `received_size` | 已接收字节数，用于断点续传 |
+| `target_slot` | 目标 slot，A 为 0，B 为 1 |
+| `target_app_addr` | 目标 slot 起始地址 |
+| `firmware_version` | 新固件版本号 |
+| `min_allowed_version` | 允许升级的最低当前版本 |
+| `failure_reason` | 失败原因码 |
+| `failure_detail` | 失败补充信息 |
+| `checkpoint_size` | 断点续传 checkpoint，当前为 4KB |
+| `binary_sequence` | 二进制包序号 |
+
+## 防回滚策略
+
+boot state 位于内部 Flash 的两个保留页，采用主备冗余和 CRC。它保存：
+
+- `active_slot`：bootloader 当前要启动的 slot
+- `confirmed_slot`：已经被 app 确认可用的 slot
+- `pending_slot`：刚升级、等待 app 确认的 slot
+- `accepted_version`：已经确认运行过的最高版本
+- `pending_version`：当前 pending 固件版本
+- `boot_attempts`：pending slot 启动尝试次数
+- `sequence` 和 CRC：用于在主备记录中选择最新有效状态
+
+升级时，如果 `firmware_version < accepted_version`，bootloader 拒绝应用并记录 `OTA_FAIL_VERSION_ROLLBACK`。如果设备当前版本低于包里声明的 `min_allowed_version`，也拒绝应用。
+
+## A/B 启动与回滚
+
+完整流程：
+
+1. 当前 app 运行在 A 时，默认 OTA 目标是 B；当前 app 运行在 B 时，默认 OTA 目标是 A。
+2. app 接收 bin 到 W25Q image slot，并把 manifest 标记为 `STAGED`。
+3. `OTA APPLY` 把 manifest 标记为 `PENDING`，然后软跳 bootloader。
+4. bootloader 校验 manifest、镜像头、整包 CRC。
+5. bootloader 擦写 inactive slot，并校验写入后的内部 Flash CRC。
+6. bootloader 写 boot state：`pending_slot = target_slot`，`active_slot = target_slot`。
+7. 新 app 启动后调用 `ota_update_confirm_boot()`。
+8. confirm 成功后，boot state 更新 `confirmed_slot` 和 `accepted_version`。
+9. 如果 pending slot 多次启动仍未 confirm，bootloader 回滚到上一个 confirmed slot。
+
+当前确认阈值是 `OTA_BOOT_CONFIRM_MAX_ATTEMPTS = 2`。
 
 ## 串口传输协议
 
-PC 不直接发送裸二进制流，而是把 bin 按 64 字节切片，每片转成 hex 字符串，再通过 ASCII 命令发送。
+### 兼容文本协议
 
-命令顺序：
+旧文本协议仍然保留，便于串口助手和人工调试：
 
 ```text
 OTA ABORT
-OTA BEGIN size=<bin总大小> crc=<整包CRC32>
-OTA DATA off=<偏移> len=<本包长度> crc=<本包CRC32> hex=<本包hex字符串>
-OTA DATA ...
+OTA BEGIN size=<bin_size> crc=<image_crc32> version=<version> min=<min_version> slot=<A|B|0|1>
+OTA DATA off=<offset> len=<len> crc=<chunk_crc32> hex=<hex_data>
 OTA END
 OTA APPLY
+OTA STATUS?
+OTA RESUME?
 ```
 
-示例：
+`slot`、`version`、`min` 可选。未指定 `slot` 时，app 自动选择当前运行 slot 的另一侧。
+
+### 直接二进制协议
+
+为了提升速度，新增 `OTAB` 二进制包。二进制包避免 hex 膨胀，单包 payload 最大 256 字节。
+
+包头为小端格式：
+
+| 字段 | 大小 | 含义 |
+|---|---:|---|
+| magic | 4 | `OTAB`，数值 `0x4241544F` |
+| header_size | 2 | 当前为 20 |
+| payload_len | 2 | payload 字节数 |
+| sequence | 4 | 包序号 |
+| offset | 4 | 写入 W25Q image slot 的偏移 |
+| payload_crc32 | 4 | payload CRC32 |
+| payload | N | 原始 app bin 数据 |
+
+UART 收到以 `OTAB` 开头的数据块时，直接走 `ota_binary_process()`；普通 ASCII 行继续走 `ota_command_process()`。
+
+主机侧可以使用仓库内脚本发送二进制 OTA：
 
 ```text
-OTA BEGIN size=90732 crc=477DA01C
-OTA DATA off=0 len=64 crc=XXXXXXXX hex=<128个hex字符>
-OTA END
-OTA APPLY
+python tools/rt103_ota_send.py --port COM5 --image .pio/build/app_b/Ems_0.0.1.bin --version 2 --slot B --apply
 ```
 
-设计取舍：
+如果当前运行在 B 槽，下一次应发送 `app_a` bin，并把 `--slot` 改为 `A`。
 
-- 使用 ASCII hex，方便串口助手和日志观察
-- 每包带 offset，app 可以拒绝乱序包
-- 每包带 CRC32，能快速发现单包损坏
-- 整包再做 CRC32，避免“单包都对但整体不完整”
-- 单包最大 64 字节，串口行长同步扩到 192 字节
+## 断点续传
 
-## app 侧做什么
+app 在接收过程中维护 `received_size` 和运行中的 CRC。为了减少 W25Q manifest 擦写次数，不是每包都写 manifest，而是每跨过 4KB checkpoint 或收完整包时写一次。
 
-app 的 OTA 入口是 `ota_command_process()`，主要处理：
+断电或串口中断后，PC 可以发送：
 
-- `OTA BEGIN`：检查 size 和整包 CRC，清 manifest，擦 W25Q image slot，写入 `RECEIVING` manifest
-- `OTA DATA`：检查 offset、len、chunk CRC，把数据写入 W25Q image slot
-- `OTA END`：检查 received size 和整包 CRC，通过后标记 `STAGED`
-- `OTA APPLY`：检查 bootloader 向量有效，把 manifest 改成 `PENDING`，软跳 bootloader
-- `OTA STATUS?`：返回当前状态和进度
-- `OTA ABORT`：中止当前 OTA，并清 manifest
+```text
+OTA RESUME?
+```
 
-app 侧不写内部 Flash app 区，只写 W25Q 暂存区。
+设备返回当前可续传位置，例如：
 
-## manifest 状态机
+```text
+OK OTA RESUME receiving off=4096 size=92356 version=2 slot=1
+```
 
-manifest 是 app 和 bootloader 的交接契约。
+PC 从 `off` 位置重新发送。checkpoint 之后已写入但尚未持久化的尾部数据会被覆盖，不影响最终 CRC。
 
-| 状态 | 含义 |
+## 失败原因码
+
+manifest v2 的失败码用于售后定位。当前已定义：
+
+| 原因码 | 含义 |
 |---|---|
-| `RECEIVING` | 正在接收串口分包 |
-| `STAGED` | app 已收到完整镜像，并且整包 CRC 通过 |
-| `PENDING` | 用户执行了 `OTA APPLY`，等待 bootloader 应用 |
-| `APPLIED` | bootloader 已经把镜像写入内部 Flash |
-| `ERROR` | bootloader 校验或写入失败 |
+| `OTA_FAIL_NONE` | 无错误 |
+| `OTA_FAIL_HEADER_INVALID` | 暂存镜像向量表非法 |
+| `OTA_FAIL_IMAGE_CRC_MISMATCH` | W25Q 暂存镜像 CRC 不匹配 |
+| `OTA_FAIL_FLASH_ERASE_FAILED` | 内部 Flash 擦除失败 |
+| `OTA_FAIL_FLASH_PROGRAM_FAILED` | 内部 Flash 写入失败 |
+| `OTA_FAIL_APP_CRC_MISMATCH` | 写入后的 app CRC 不匹配 |
+| `OTA_FAIL_VERSION_ROLLBACK` | 版本低于已接受版本 |
+| `OTA_FAIL_BOOT_CONFIRM_TIMEOUT` | pending slot 启动后未确认，触发回滚 |
+| `OTA_FAIL_BOOT_STATE_WRITE_FAILED` | boot state 写入失败 |
 
-bootloader 只处理 `PENDING`。如果不是 `PENDING`，bootloader 直接跳 app。
+`OTA STATUS?` 会返回 `fail=<reason> detail=<detail>`。
 
-## bootloader 侧做什么
+## 为什么 OTA APPLY 仍然用软跳
 
-bootloader 启动后会先拉高 PB10/KEY_OUT，维持板子上电，然后初始化本地 GPIO、SPI1、W25Q。
+RT-103 的电源保持依赖 PB10/KEY_OUT。硬复位期间 app 无法继续维持 PB10，板子可能掉电，所以 `OTA APPLY` 不使用 `HAL_NVIC_SystemReset()`。
 
-如果 manifest 是 `PENDING`，bootloader 会按顺序做：
+软跳步骤：
 
-1. 读取 manifest
-2. 校验 manifest 自身合法性
-3. 校验 W25Q image header
-   - MSP 必须在 SRAM 范围
-   - ResetHandler 必须在 app Flash 范围
-   - ResetHandler 必须是 Thumb 地址
-4. 校验 W25Q image CRC
-5. 擦除内部 Flash app 区
-6. 从 W25Q 分块读取并写入 `0x08008000`
-7. 校验内部 Flash app CRC
-8. 标记 `APPLIED`
-9. 跳转 app
+1. app 保持 PB10 高电平。
+2. 停 SysTick。
+3. 清 PendSV 和 SysTick pending。
+4. 清 NVIC enable 和 pending。
+5. 切回 HSI。
+6. 切 VTOR 到 bootloader。
+7. 设置 bootloader MSP。
+8. 跳 bootloader ResetHandler。
 
-## 为什么 OTA APPLY 用软跳
-
-RT-103 的硬件电源保持依赖 PB10/KEY_OUT。硬复位期间 app 不能继续维持 PB10，板子可能掉电，所以 `OTA APPLY` 不使用 `HAL_NVIC_SystemReset()`。
-
-当前做法是：
-
-- app 在离开前保持 PB10 高电平
-- 停 SysTick
-- 清 PendSV 和 SysTick pending
-- 清 NVIC enable 和 pending
-- 切回 HSI
-- 切 VTOR 到 bootloader
-- 设置 bootloader MSP
-- 跳 bootloader ResetHandler
-
-这样能在不掉电的情况下进入 bootloader。
-
-## bootloader 跳 app 前为什么要清理状态
-
-软跳不是硬复位，很多外设状态不会自动回到复位值。联调时发现，如果 bootloader 直接跳 app，app 会卡在 DMA 初始化附近。
-
-最终在 bootloader 跳 app 前增加：
-
-- 复位 app 会重新使用的 DMA、USART、SPI、I2C、TIM、ADC
-- 清 DMA 通道和 DMA interrupt flags
-- 清 NVIC enable 和 pending
-- 清 PendSV 和 SysTick pending
-- 刷新 STM32F1 Flash prefetch
-- 设置 VTOR 到 app base
-- 设置 MSP 到 app vector table 的初始栈
-
-这样让 app 入口更接近硬复位后的状态。
+bootloader 跳 app 前也会清 DMA、USART、SPI、I2C、TIM、ADC 等 app 可见外设，并刷新 STM32F1 Flash prefetch，避免软跳留下的外设状态影响 app 初始化。
 
 ## 用户数据如何保存
 
-用户数据保存在 W25Q 的 LittleFS 区，OTA 暂存区和 LittleFS 区分离：
+用户数据保存在 W25Q 的 LittleFS 区，OTA 暂存区和 LittleFS 分离：
 
-- OTA manifest 在 `0x00000000`
-- OTA image slot 从 `0x00001000` 开始
-- LittleFS 从 `0x00041000` 开始
+- OTA manifest 位于 `0x00000000`
+- OTA image slot 位于 `0x00001000`
+- LittleFS 位于 `0x00041000`
 
-OTA 擦写只覆盖 manifest 和 image slot，不擦 LittleFS。内部 Flash 只擦 app 区，不擦 bootloader。
+内部 Flash 的 A/B slot 只保存程序，不保存用户数据。升级和回滚不会主动擦 LittleFS。
 
-同时 W25Q 驱动增加了共享锁，LittleFS 和 OTA 不会同时抢 SPI 总线。
+## 验证状态
 
-## 第一次烧录方式
+本轮 A/B 增强已完成：
 
-第一次需要通过 STM32 ROM bootloader 烧入合并镜像：
+- PowerShell 全量 guard 通过。
+- `pio run -e bootloader -e app_a -e app_b` 编译通过。
+- app A 和 app B 均约 92KB，小于单 slot 112KB。
+- bootloader 约 6.5KB，小于 28KB bootloader 区。
 
-- bootloader 烧到 `0x08000000`
-- app 烧到 `0x08008000`
+需要继续做的硬件验证：
 
-硬件控制线固定为：
-
-- RTS 高电平复位
-- RTS 低电平释放复位
-- DTR 低电平进入 STM32 ROM bootloader
-- DTR 高电平正常从 Flash 启动
-
-因为板子上电需要按 SW1，进入 ROM bootloader 烧录时必须按住 SW1，直到写入和读回校验结束。
-
-## 验证结果
-
-最终生产版验证过：
-
-- ROM 串口刷入合并镜像，写入并读回校验通过
-- app 正常启动，日志到达 `[ui_task] entering main loop`
-- 串口 OTA 完整下发 app bin
-- `OTA BEGIN`、`OTA DATA`、`OTA END`、`OTA APPLY` 均返回 OK
-- `OTA APPLY` 后直接回到 app 主循环
-- 全量 guard 脚本通过
-
-## 风险和后续优化
-
-当前方案已经能完成 OTA，但仍有几个后续可以增强的点：
-
-- 增加版本号和防回滚策略
-- 增加断点续传能力
-- 增加传输压缩或直接二进制协议，提高速度
-- 增加 A/B app 分区，提高断电恢复能力
-- 增加 manifest 失败原因码，方便售后定位
-
-当前版本的重点是先把“串口下发、外部 Flash 暂存、bootloader 应用、保护用户数据、软跳不掉电”这条主链路跑通。
+- 用 COM5 对当前 A 槽设备下发 `app_b` bin，验证 A 到 B。
+- 重启后确认 `ota_update_confirm_boot()` 能把 B 标记为 confirmed。
+- 再下发 `app_a` bin，验证 B 到 A。
+- 人为断电测试：接收中断点续传、apply 过程中断电、pending 未 confirm 回滚。
