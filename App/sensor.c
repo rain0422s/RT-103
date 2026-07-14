@@ -2,6 +2,7 @@
 #include "led_control.h"
 #include "utils.h"
 #include "storage.h"
+#include "battery_profile.h"
 #include "read_data_simple.h"
 #include "lis2dh12_config.h"
 #include "eeprom_layout.h"
@@ -39,16 +40,10 @@
 #define BATTERY_ADC_MAX                4095U
 #define BATTERY_DIVIDER_TOP_OHM        300000U
 #define BATTERY_DIVIDER_BOTTOM_OHM     150000U
-#define BATTERY_CUTOFF_MV              2750U
-#define BATTERY_UI_EMPTY_MV            3300U
-#define BATTERY_FULL_MV                4200U
-#define BATTERY_CAPACITY_MAH           2000U
-#define BATTERY_CHARGE_CURRENT_MIN_MA  1000U
-#define BATTERY_CHARGE_CURRENT_MAX_MA  2000U
-#define BATTERY_DISCHARGE_TEMP_MIN_C   (-20)
-#define BATTERY_DISCHARGE_TEMP_MAX_C   60
-#define BATTERY_CHARGE_TEMP_MIN_C      0
-#define BATTERY_CHARGE_TEMP_MAX_C      50
+#define BATTERY_CAL_MIN_MV             RT103_BATTERY_PROTECT_UNDERVOLT_TYP_MV
+#define BATTERY_CAL_MAX_MV             RT103_BATTERY_CHARGE_LIMIT_MAX_MV
+#define BATTERY_UI_EMPTY_MV            RT103_BATTERY_UI_EMPTY_MV
+#define BATTERY_FULL_MV                RT103_BATTERY_FULL_MV
 #define BATTERY_POLL_MS                1000U
 #define BATTERY_ADC_TRIM_DIVISOR       10U
 #define BATTERY_FILTER_PREV_WEIGHT     7U
@@ -534,7 +529,7 @@ typedef struct {
 } battery_ocv_point_t;
 
 static const battery_ocv_point_t s_battery_ocv_table[] = {
-	{3300U, 0U},
+	{RT103_BATTERY_UI_EMPTY_MV, 0U},
 	{3500U, 10U},
 	{3600U, 20U},
 	{3680U, 30U},
@@ -544,7 +539,7 @@ static const battery_ocv_point_t s_battery_ocv_table[] = {
 	{3950U, 70U},
 	{4020U, 80U},
 	{4110U, 90U},
-	{4200U, 100U},
+	{RT103_BATTERY_FULL_MV, 100U},
 };
 
 uint8_t sensor_battery_percent_from_mv(uint16_t millivolts)
@@ -598,8 +593,8 @@ bool sensor_battery_calibrate_gain(uint16_t true_millivolts,
 	uint32_t gain;
 
 	if (out_gain_permyriad == NULL || s_battery_raw_mv == 0U ||
-	    true_millivolts < BATTERY_CUTOFF_MV ||
-	    true_millivolts > BATTERY_FULL_MV + 100U) {
+	    true_millivolts < BATTERY_CAL_MIN_MV ||
+	    true_millivolts > BATTERY_CAL_MAX_MV) {
 		return false;
 	}
 	target = (int32_t)true_millivolts - (int32_t)s_battery_offset_mv;

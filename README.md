@@ -23,7 +23,21 @@ Environmental Monitoring Station (EMS) based on STM32F103RCT6.
 - **Display**: OLED (U8G2)
 - **LEDs**: Red / Blue status LEDs + PWM breathing LED
 - **Button**: Short press, long press, double click detection
+- **Battery**: 702035 protected 1S LiPo, 3.7V / 500mAh
 - **Programming**: ST-Link (SWD) or Serial (UART)
+
+## Battery Profile
+
+RT-103 is configured for a 702035 protected 1S LiPo pack. The firmware profile
+lives in `App/battery_profile.h`; the project note is
+`docs/rt103_battery_702035.md`.
+
+Key limits:
+- Full voltage: `4200mV`, charger tolerance max `4230mV`
+- Max continuous charge current: `250mA`
+- Max continuous discharge current: `250mA`
+- UI empty point: `3300mV`
+- Reserved low warning / soft shutdown points: `3400mV` / `3200mV`
 
 ## Project Structure
 

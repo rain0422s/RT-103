@@ -6,6 +6,7 @@
 #include "rtc_clock.h"
 #include "storage.h"
 #include "sensor.h"
+#include "battery_profile.h"
 #include "display.h"
 #include "ota_layout.h"
 #include "ota_update.h"
@@ -167,7 +168,8 @@ static bool uart_parse_mv(const char *s, uint16_t *out_mv)
 	}
 	if (has_dot)
 		whole = whole * 1000U + frac;
-	if (whole < 2500U || whole > 4300U)
+	if (whole < RT103_BATTERY_PROTECT_UNDERVOLT_TYP_MV ||
+	    whole > RT103_BATTERY_CHARGE_LIMIT_MAX_MV)
 		return false;
 	*out_mv = (uint16_t)whole;
 	return true;

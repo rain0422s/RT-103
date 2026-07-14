@@ -5,6 +5,7 @@
 #include "display.h"
 #include "storage.h"
 #include "sensor.h"
+#include "battery_profile.h"
 #include "gesture.h"
 #include "lfs_port.h"
 #include "ui_menu_registry.h"
@@ -1074,8 +1075,8 @@ static void ui_draw_clock(u8g2_t *pu8g2, short offset_x)
 #define UI_BAT_CHART_Y 17
 #define UI_BAT_CHART_W 116
 #define UI_BAT_CHART_H 37
-#define UI_BAT_CHART_V_MIN_MV 3000U
-#define UI_BAT_CHART_V_MAX_MV 4200U
+#define UI_BAT_CHART_V_MIN_MV RT103_BATTERY_CHART_MIN_MV
+#define UI_BAT_CHART_V_MAX_MV RT103_BATTERY_CHART_MAX_MV
 
 static short ui_chart_map_x(const storage_battery_history_point_t *p,
                             uint32_t t_min, uint32_t t_max)
